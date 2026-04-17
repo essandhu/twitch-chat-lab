@@ -1,13 +1,23 @@
+import { useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useChatStore } from './store/chatStore'
 import { AuthCallback } from './features/auth/AuthCallback'
 import { ConnectForm } from './features/auth/ConnectForm'
+import { StreamHeader } from './components/StreamHeader'
+import { TabBar } from './components/TabBar'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { ChatPanel } from './features/chat/ChatPanel'
+import { FirstTimerPanel } from './features/firstTimers/FirstTimerPanel'
 
 // TODO(phase-3): Ctrl+Shift+P global keydown listener → perfStore.toggleVisibility
 // (lives here because PerfOverlay lands alongside it in phase 3).
+// TODO(phase-3): center heatmap panel column in <main>
+// TODO(phase-4): right multi-stream panel column in <main>
 
 const LandingView = () => {
   const session = useChatStore((s) => s.session)
+  const firstTimerCount = useChatStore((s) => s.firstTimers.length)
+  const [activeTabId, setActiveTabId] = useState<'chat' | 'firstTimers'>('chat')
 
   if (!session) {
     return (
@@ -23,22 +33,36 @@ const LandingView = () => {
     )
   }
 
+  const tabs = [
+    { id: 'chat', label: 'Chat' },
+    { id: 'firstTimers', label: 'First-Timers', badgeCount: firstTimerCount },
+  ]
+
   return (
-    <div className="min-h-screen p-10">
-      <div className="grain relative border border-ink-700 bg-ink-900/50 p-8">
-        <div className="mb-4 font-mono text-[11px] uppercase tracking-[0.3em] text-ember-500">
-          Connected
-        </div>
-        <h1 className="font-display text-4xl font-light text-ink-100">
-          {session.broadcasterDisplayName}
-        </h1>
-        <p className="mt-2 font-mono text-sm text-ink-300">
-          {session.streamTitle || '— stream offline —'}
-        </p>
-        <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-500">
-          Open DevTools → check <span className="text-ember-500">useChatStore.getState().messages</span> as chat arrives.
-        </p>
-      </div>
+    <div className="flex h-screen flex-col">
+      <ErrorBoundary label="Stream header">
+        <StreamHeader />
+      </ErrorBoundary>
+      <main className="flex-1 min-h-0 grid grid-cols-1 gap-4 p-4">
+        <section className="flex flex-col min-h-0 border border-ink-800 bg-ink-900/40">
+          <TabBar
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onTabChange={(id) => setActiveTabId(id as 'chat' | 'firstTimers')}
+          />
+          <div className="flex-1 min-h-0">
+            {activeTabId === 'chat' ? (
+              <ErrorBoundary label="Chat">
+                <ChatPanel />
+              </ErrorBoundary>
+            ) : (
+              <ErrorBoundary label="First-timers">
+                <FirstTimerPanel />
+              </ErrorBoundary>
+            )}
+          </div>
+        </section>
+      </main>
     </div>
   )
 }
