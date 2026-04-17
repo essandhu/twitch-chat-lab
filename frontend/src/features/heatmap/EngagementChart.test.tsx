@@ -1,8 +1,76 @@
 import { render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import type { ReactNode } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useHeatmapStore } from '../../store/heatmapStore'
+import { useMultiStreamStore } from '../../store/multiStreamStore'
 import type { EventAnnotation, HeatmapDataPoint } from '../../types/twitch'
 import { EngagementChart, formatTickMMSS } from './EngagementChart'
+
+// Recharts' ResponsiveContainer measures the DOM for width/height. happy-dom
+// reports 0×0 so the chart body never renders, making DOM-level assertions on
+// <Line>/<Legend>/<ReferenceLine> impossible in multi-mode. Mock Recharts with
+// lightweight shims that mirror the production DOM structure enough for
+// us to assert on <Line> count, palette strokes, Legend names, and annotation
+// labels. Single-mode tests below do NOT depend on this mock — they only
+// assert on the presence of `.recharts-responsive-container` / empty-state
+// text, which remain satisfied because our stubbed ResponsiveContainer emits
+// that class name.
+vi.mock('recharts', () => {
+  const ResponsiveContainer = ({ children }: { children: ReactNode }) => (
+    <div
+      className="recharts-responsive-container"
+      style={{ width: 600, height: 300 }}
+    >
+      {children}
+    </div>
+  )
+  // Each Line renders a <path> AND a <text> sibling carrying its name, so that
+  // a top-level screen.getByText(name) resolves to Recharts' Legend-equivalent
+  // DOM. In real Recharts, the Legend is a separate component that reads
+  // series metadata from chart context; replicating that context wiring inside
+  // a mock is brittle, so we co-locate the name label with the Line path.
+  const Line = ({ stroke, name }: { stroke?: string; name?: string }) => (
+    <>
+      <path
+        className="recharts-line-curve"
+        data-name={name}
+        stroke={stroke}
+        fill="none"
+      />
+      {name ? (
+        <text className="recharts-legend-item-text">{name}</text>
+      ) : null}
+    </>
+  )
+  const LineChart = ({ children }: { children?: ReactNode }) => (
+    <svg className="recharts-surface" width={600} height={300}>
+      {children}
+    </svg>
+  )
+  const Legend = () => <div className="recharts-legend-wrapper" data-testid="legend" />
+
+  const XAxis = () => null
+  const YAxis = () => null
+  const ReferenceLine = ({
+    label,
+  }: {
+    x?: number
+    label?: { value: string } | string
+  }) => {
+    const text =
+      typeof label === 'string' ? label : (label?.value ?? '')
+    return <text className="recharts-reference-line-label">{text}</text>
+  }
+  return {
+    ResponsiveContainer,
+    LineChart,
+    Line,
+    Legend,
+    XAxis,
+    YAxis,
+    ReferenceLine,
+  }
+})
 
 describe('EngagementChart', () => {
   beforeEach(() => {
@@ -75,6 +143,135 @@ describe('EngagementChart', () => {
 
     // Phase 5 Playwright will visually confirm the dashed ReferenceLine strokes;
     // happy-dom's SVG layout is too brittle to assert on <line stroke-dasharray>.
+  })
+})
+
+describe('EngagementChart — multi-stream mode', () => {
+  const palette = ['#f5a524', '#58a6ff', '#7ee0a6']
+
+  const seedMultiMode = (slices: Array<{ login: string; displayName: string }>): void => {
+    const store = useMultiStreamStore.getState()
+    store.reset()
+    for (const slice of slices) {
+      store.addStream({
+        login: slice.login,
+        displayName: slice.displayName,
+        broadcasterId: `b_${slice.login}`,
+      })
+    }
+    useMultiStreamStore.getState().setActive(true)
+  }
+
+  const seedDataPoints = (login: string, count: number, startMs: number): void => {
+    const dataPoints: HeatmapDataPoint[] = Array.from({ length: count }, (_, i) => ({
+      timestamp: startMs + i * 1000,
+      msgPerSec: 1 + i,
+    }))
+    useMultiStreamStore.setState((state) => ({
+      streams: {
+        ...state.streams,
+        [login]: { ...state.streams[login]!, dataPoints },
+      },
+    }))
+  }
+
+  const seedAnnotations = (login: string, annotations: EventAnnotation[]): void => {
+    useMultiStreamStore.setState((state) => ({
+      streams: {
+        ...state.streams,
+        [login]: { ...state.streams[login]!, annotations },
+      },
+    }))
+  }
+
+  beforeEach(() => {
+    useHeatmapStore.getState().reset()
+    useMultiStreamStore.getState().reset()
+    if (typeof globalThis.ResizeObserver === 'undefined') {
+      globalThis.ResizeObserver = class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      } as unknown as typeof ResizeObserver
+    }
+  })
+
+  afterEach(() => {
+    useMultiStreamStore.getState().reset()
+  })
+
+  it('renders one <Line> per stream using the rotated palette', () => {
+    const start = 1_700_000_000_000
+    seedMultiMode([
+      { login: 'alice', displayName: 'Alice' },
+      { login: 'bob', displayName: 'Bob' },
+      { login: 'carol', displayName: 'Carol' },
+    ])
+    seedDataPoints('alice', 4, start)
+    seedDataPoints('bob', 4, start)
+    seedDataPoints('carol', 4, start)
+
+    const { container } = render(
+      <div style={{ width: 600, height: 300 }}>
+        <EngagementChart />
+      </div>,
+    )
+
+    const lines = container.querySelectorAll('path.recharts-line-curve')
+    expect(lines.length).toBe(3)
+    // Each line gets the palette hex in order (rotated via modulo).
+    const strokes = Array.from(lines).map((el) => el.getAttribute('stroke'))
+    expect(strokes).toEqual(palette.slice(0, 3))
+  })
+
+  it('renders a Legend with the stream display names in multi mode', () => {
+    const start = 1_700_000_000_000
+    seedMultiMode([
+      { login: 'alice', displayName: 'Alice' },
+      { login: 'bob', displayName: 'Bob' },
+    ])
+    seedDataPoints('alice', 3, start)
+    seedDataPoints('bob', 3, start)
+
+    render(
+      <div style={{ width: 600, height: 300 }}>
+        <EngagementChart />
+      </div>,
+    )
+
+    // Legend component is present.
+    expect(screen.getByTestId('legend')).toBeInTheDocument()
+    // Series names are rendered via the Line `name` prop, visible in the DOM.
+    expect(screen.getByText('Alice')).toBeInTheDocument()
+    expect(screen.getByText('Bob')).toBeInTheDocument()
+  })
+
+  it('prefixes annotations with the stream display name in multi mode', () => {
+    const start = 1_700_000_000_000
+    seedMultiMode([
+      { login: 'alice', displayName: 'Alice' },
+      { login: 'bob', displayName: 'Bob' },
+    ])
+    seedDataPoints('alice', 4, start)
+    seedDataPoints('bob', 4, start)
+    seedAnnotations('alice', [
+      { timestamp: start + 1000, type: 'raid', label: 'Raid x50' },
+    ])
+    seedAnnotations('bob', [
+      { timestamp: start + 2000, type: 'hype_train_begin', label: 'Hype train!' },
+    ])
+
+    render(
+      <div style={{ width: 600, height: 300 }}>
+        <EngagementChart />
+      </div>,
+    )
+
+    // ReferenceLine labels are rendered as SVG text; assert via text-content matcher.
+    expect(screen.getByText((content) => /Alice\s·\sRaid x50/.test(content))).toBeInTheDocument()
+    expect(
+      screen.getByText((content) => /Bob\s·\sHype train!/.test(content)),
+    ).toBeInTheDocument()
   })
 })
 

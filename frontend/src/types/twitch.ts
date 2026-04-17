@@ -126,6 +126,23 @@ export interface EventSubFrame<TPayload = unknown> {
 }
 
 // =============================================================================
+// Proxy envelope — shape emitted by the Phase 4 aggregator proxy.
+// Each frame wraps the upstream Twitch EventSub envelope and tags it with the
+// stream_login so the frontend can fan it out to the correct multiStream slice.
+// =============================================================================
+
+export interface ProxyEnvelope<TPayload = unknown> {
+  stream_login: string
+  event_type: string
+  payload: EventSubFrame<TPayload>
+}
+
+export interface ProxyErrorFrame {
+  error: 'upstream_lost'
+  stream_login: string
+}
+
+// =============================================================================
 // EventSub event payloads (snake_case — matches Twitch wire format)
 // =============================================================================
 

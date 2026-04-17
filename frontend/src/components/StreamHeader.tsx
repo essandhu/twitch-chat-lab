@@ -1,12 +1,15 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useChatStore } from '../store/chatStore'
 import { twitchHelixClient } from '../features/auth/authServices'
 import { logger } from '../lib/logger'
+import { StreamSelector, type StreamPick } from '../features/multiStream/StreamSelector'
+import { startCompare } from '../features/multiStream/multiStreamService'
 
 export function StreamHeader(): JSX.Element | null {
   const session = useChatStore((s) => s.session)
   const setSession = useChatStore((s) => s.setSession)
   const broadcasterLogin = session?.broadcasterLogin ?? null
+  const [selectorOpen, setSelectorOpen] = useState(false)
 
   useEffect(() => {
     if (broadcasterLogin === null) return
@@ -45,6 +48,29 @@ export function StreamHeader(): JSX.Element | null {
   if (session === null) return null
 
   const isOffline = session.viewerCount === 0 && session.gameName === ''
+  // Disable when there's no category to query — can't find peer streams otherwise.
+  const canCompare = session.gameId.length > 0
+  const compareTitle = canCompare
+    ? 'Compare this stream with up to 2 others in the same category'
+    : 'Connect to a stream first'
+
+  const handleConfirm = async (picks: StreamPick[]): Promise<void> => {
+    setSelectorOpen(false)
+    try {
+      // authedUserId is not on the StreamSession today (Phase 2 didn't need it);
+      // resolve it via /users on demand. For multi-stream we need user_id for
+      // the EventSub subscriptions on the current channel.
+      const me = await twitchHelixClient.getUser()
+      if (!me) throw new Error('failed_to_resolve_user')
+      await startCompare({
+        session,
+        authedUserId: me.id,
+        picks,
+      })
+    } catch (err) {
+      logger.error('multiStream.start.error', { error: String(err) })
+    }
+  }
 
   return (
     <header className="flex items-baseline gap-6 border-b border-ink-800 bg-ink-900/40 px-6 py-4">
@@ -56,21 +82,44 @@ export function StreamHeader(): JSX.Element | null {
           {session.gameName || 'uncategorized'}
         </p>
       </div>
-      <div className="flex items-center gap-2">
-        {/* TODO(phase-4): "Compare streams" entry point */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          disabled={!canCompare}
+          title={compareTitle}
+          onClick={() => setSelectorOpen(true)}
+          className={`border border-ink-700 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.22em] ${
+            canCompare
+              ? 'text-ink-100 hover:bg-ink-800'
+              : 'text-ink-500 cursor-not-allowed'
+          }`}
+        >
+          Compare streams
+        </button>
         {isOffline ? (
           <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-500">
             offline
           </span>
         ) : (
-          <>
+          <span className="flex items-center gap-2">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-ember-500" />
             <span className="font-mono text-sm text-ink-100">
               {session.viewerCount.toLocaleString('en-US')} viewers
             </span>
-          </>
+          </span>
         )}
       </div>
+      {selectorOpen && session.gameId && (
+        <StreamSelector
+          gameId={session.gameId}
+          currentLogin={session.broadcasterLogin}
+          onConfirm={(picks) => {
+            // Fire-and-forget — the service logs its own errors.
+            void handleConfirm(picks)
+          }}
+          onCancel={() => setSelectorOpen(false)}
+        />
+      )}
     </header>
   )
 }

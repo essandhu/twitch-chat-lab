@@ -3,10 +3,18 @@ import { useChatMessages } from '../../hooks/useChatMessages'
 import { useVirtualChat } from '../../hooks/useVirtualChat'
 import { ChatMessage } from './ChatMessage'
 import { ScrollToBottom } from './ScrollToBottom'
+import type { ChatMessage as ChatMessageType } from '../../types/twitch'
 
-export function ChatList(): JSX.Element {
+interface ChatListProps {
+  messagesOverride?: ChatMessageType[]
+}
+
+export function ChatList({ messagesOverride }: ChatListProps = {}): JSX.Element {
   const parentRef = useRef<HTMLDivElement>(null)
-  const messages = useChatMessages()
+  // Rules of hooks: always call useChatMessages. When override is provided,
+  // we use it instead — preserves Phase 2 single-stream behavior when absent.
+  const storeMessages = useChatMessages()
+  const messages = messagesOverride ?? storeMessages
   const virtualizer = useVirtualChat(messages, parentRef)
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true)
 
@@ -56,6 +64,8 @@ export function ChatList(): JSX.Element {
 
   try {
     performance.mark('virt-end')
+    // measure name is shared across all ChatList instances intentionally;
+    // usePerfMetrics reads max across entries. See docs/phase-4-tasks.md P4-15.
     performance.measure('virt', 'virt-start', 'virt-end')
   } catch {
     // Performance API unavailable; skip marks.

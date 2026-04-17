@@ -3,16 +3,12 @@ import { useChatStore } from '../store/chatStore'
 import { useHeatmapStore } from '../store/heatmapStore'
 import type {
   ChannelChatMessageEvent,
-  ChannelHypeTrainBeginEvent,
-  ChannelHypeTrainEndEvent,
-  ChannelRaidEvent,
-  ChannelSubscribeEvent,
-  ChannelSubscriptionGiftEvent,
   EventSubFrame,
   EventSubNotificationPayload,
   EventSubSessionReconnectPayload,
   EventSubSessionWelcomePayload,
 } from '../types/twitch'
+import { annotationFromEvent } from './annotationFromEvent'
 import { recordLatencySample } from './EventSubLatencyChannel'
 import type { TwitchHelixClient } from './TwitchHelixClient'
 import { HelixError } from './TwitchHelixClient'
@@ -64,39 +60,6 @@ const buildSubscriptionSpecs = (broadcasterId: string, userId: string): Subscrip
     condition: { broadcaster_user_id: broadcasterId },
   },
 ]
-
-const formatNumber = (n: number): string => n.toLocaleString('en-US')
-
-const annotationFromEvent = (
-  subscriptionType: string,
-  event: unknown,
-): { type: 'raid' | 'subscription' | 'hype_train_begin' | 'hype_train_end' | 'gift_sub'; label: string } | null => {
-  if (subscriptionType === 'channel.raid') {
-    const e = event as ChannelRaidEvent
-    return {
-      type: 'raid',
-      label: `Raid from ${e.from_broadcaster_user_name} (${formatNumber(e.viewers)} viewers)`,
-    }
-  }
-  if (subscriptionType === 'channel.subscribe') {
-    const e = event as ChannelSubscribeEvent
-    return { type: 'subscription', label: `Subscription from ${e.user_name}` }
-  }
-  if (subscriptionType === 'channel.subscription.gift') {
-    const e = event as ChannelSubscriptionGiftEvent
-    const who = e.is_anonymous || !e.user_name ? 'Anonymous' : e.user_name
-    return { type: 'gift_sub', label: `Gift sub from ${who} (${e.total} subs)` }
-  }
-  if (subscriptionType === 'channel.hype_train.begin') {
-    const e = event as ChannelHypeTrainBeginEvent
-    return { type: 'hype_train_begin', label: `Hype train started (level ${e.level})` }
-  }
-  if (subscriptionType === 'channel.hype_train.end') {
-    const e = event as ChannelHypeTrainEndEvent
-    return { type: 'hype_train_end', label: `Hype train ended at level ${e.level}` }
-  }
-  return null
-}
 
 export class EventSubManager {
   private helix: TwitchHelixClient

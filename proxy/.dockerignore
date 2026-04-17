@@ -1,0 +1,8 @@
+*.md
+*_test.go
+.env*
+.git
+.gitignore
+.dockerignore
+Dockerfile
+fly.toml
