@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useChatStore } from './store/chatStore'
+import { useMultiStreamStore } from './store/multiStreamStore'
 import { usePerfStore } from './store/perfStore'
 import { AuthCallback } from './features/auth/AuthCallback'
 import { ConnectForm } from './features/auth/ConnectForm'
@@ -10,13 +11,13 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { ChatPanel } from './features/chat/ChatPanel'
 import { FirstTimerPanel } from './features/firstTimers/FirstTimerPanel'
 import { HeatmapPanel } from './features/heatmap/HeatmapPanel'
+import { MultiStreamLayout } from './features/multiStream/MultiStreamLayout'
 import { PerfOverlay } from './features/perfPanel/PerfOverlay'
-
-// TODO(phase-4): right multi-stream panel column in <main>
 
 export const LandingView = () => {
   const session = useChatStore((s) => s.session)
   const firstTimerCount = useChatStore((s) => s.firstTimers.length)
+  const isMultiActive = useMultiStreamStore((s) => s.isActive)
   const [activeTabId, setActiveTabId] = useState<'chat' | 'firstTimers'>('chat')
 
   useEffect(() => {
@@ -55,24 +56,32 @@ export const LandingView = () => {
         <StreamHeader />
       </ErrorBoundary>
       <main className="flex-1 min-h-0 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 p-4">
-        <section className="flex flex-col min-h-0 border border-ink-800 bg-ink-900/40">
-          <TabBar
-            tabs={tabs}
-            activeTabId={activeTabId}
-            onTabChange={(id) => setActiveTabId(id as 'chat' | 'firstTimers')}
-          />
-          <div className="flex-1 min-h-0">
-            {activeTabId === 'chat' ? (
-              <ErrorBoundary label="Chat">
-                <ChatPanel />
-              </ErrorBoundary>
-            ) : (
-              <ErrorBoundary label="First-timers">
-                <FirstTimerPanel />
-              </ErrorBoundary>
-            )}
-          </div>
-        </section>
+        {isMultiActive ? (
+          <section className="flex flex-col min-h-0 border border-ink-800 bg-ink-900/40">
+            <ErrorBoundary label="Multi-stream">
+              <MultiStreamLayout />
+            </ErrorBoundary>
+          </section>
+        ) : (
+          <section className="flex flex-col min-h-0 border border-ink-800 bg-ink-900/40">
+            <TabBar
+              tabs={tabs}
+              activeTabId={activeTabId}
+              onTabChange={(id) => setActiveTabId(id as 'chat' | 'firstTimers')}
+            />
+            <div className="flex-1 min-h-0">
+              {activeTabId === 'chat' ? (
+                <ErrorBoundary label="Chat">
+                  <ChatPanel />
+                </ErrorBoundary>
+              ) : (
+                <ErrorBoundary label="First-timers">
+                  <FirstTimerPanel />
+                </ErrorBoundary>
+              )}
+            </div>
+          </section>
+        )}
         <section className="flex flex-col min-h-0 border border-ink-800 bg-ink-900/40">
           <ErrorBoundary label="Heatmap">
             <HeatmapPanel />

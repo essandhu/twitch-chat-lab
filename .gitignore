@@ -7,3 +7,8 @@ dist/
 coverage/
 .vite/
 .worktrees/
+
+# Go build + test artifacts
+proxy/server
+proxy/server.exe
+proxy/.gotmp/
