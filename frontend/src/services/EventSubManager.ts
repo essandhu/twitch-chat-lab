@@ -13,6 +13,7 @@ import type {
   EventSubSessionReconnectPayload,
   EventSubSessionWelcomePayload,
 } from '../types/twitch'
+import { recordLatencySample } from './EventSubLatencyChannel'
 import type { TwitchHelixClient } from './TwitchHelixClient'
 import { HelixError } from './TwitchHelixClient'
 
@@ -179,6 +180,14 @@ export class EventSubManager {
   private handleFrame(data: string, callbacks: { onWelcome: () => void }): void {
     const frame = JSON.parse(data) as EventSubFrame
     const { metadata } = frame
+
+    if (metadata.message_type === 'notification' || metadata.message_type === 'session_keepalive') {
+      try {
+        recordLatencySample(Date.now(), metadata.message_timestamp)
+      } catch (err) {
+        logger.warn('perf.latency.parse_error', { error: String(err) })
+      }
+    }
 
     if (metadata.message_type === 'session_welcome') {
       const payload = frame.payload as EventSubSessionWelcomePayload

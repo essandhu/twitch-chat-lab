@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useChatStore } from './store/chatStore'
+import { usePerfStore } from './store/perfStore'
 import { AuthCallback } from './features/auth/AuthCallback'
 import { ConnectForm } from './features/auth/ConnectForm'
 import { StreamHeader } from './components/StreamHeader'
@@ -8,16 +9,26 @@ import { TabBar } from './components/TabBar'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ChatPanel } from './features/chat/ChatPanel'
 import { FirstTimerPanel } from './features/firstTimers/FirstTimerPanel'
+import { HeatmapPanel } from './features/heatmap/HeatmapPanel'
+import { PerfOverlay } from './features/perfPanel/PerfOverlay'
 
-// TODO(phase-3): Ctrl+Shift+P global keydown listener → perfStore.toggleVisibility
-// (lives here because PerfOverlay lands alongside it in phase 3).
-// TODO(phase-3): center heatmap panel column in <main>
 // TODO(phase-4): right multi-stream panel column in <main>
 
-const LandingView = () => {
+export const LandingView = () => {
   const session = useChatStore((s) => s.session)
   const firstTimerCount = useChatStore((s) => s.firstTimers.length)
   const [activeTabId, setActiveTabId] = useState<'chat' | 'firstTimers'>('chat')
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isP = e.key === 'P' || e.key === 'p'
+      if (!isP || !e.ctrlKey || !e.shiftKey || e.altKey || e.metaKey) return
+      e.preventDefault()
+      usePerfStore.getState().toggleVisibility()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   if (!session) {
     return (
@@ -43,7 +54,7 @@ const LandingView = () => {
       <ErrorBoundary label="Stream header">
         <StreamHeader />
       </ErrorBoundary>
-      <main className="flex-1 min-h-0 grid grid-cols-1 gap-4 p-4">
+      <main className="flex-1 min-h-0 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 p-4">
         <section className="flex flex-col min-h-0 border border-ink-800 bg-ink-900/40">
           <TabBar
             tabs={tabs}
@@ -62,7 +73,15 @@ const LandingView = () => {
             )}
           </div>
         </section>
+        <section className="flex flex-col min-h-0 border border-ink-800 bg-ink-900/40">
+          <ErrorBoundary label="Heatmap">
+            <HeatmapPanel />
+          </ErrorBoundary>
+        </section>
       </main>
+      <ErrorBoundary label="Perf overlay" fallback={() => null}>
+        <PerfOverlay />
+      </ErrorBoundary>
     </div>
   )
 }
