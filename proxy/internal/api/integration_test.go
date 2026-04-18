@@ -357,11 +357,21 @@ func TestE2E_ThreeChannelFanIn(t *testing.T) {
 	// already gone.
 	_ = wsConn.Close()
 
-	// Verify no major goroutine leak. httptest keeps a pool alive and slog
-	// may retain a worker or two, so we allow a small band above baseline.
-	// Reaping isn't perfectly synchronous on Linux CI under -race (observed
-	// ~11 stragglers 150ms after DELETE), so poll until we're under the
-	// tolerance or a 2s deadline fires.
+	// Close httptest servers and idle HTTP keep-alive connections
+	// explicitly before the goroutine-count assertion; otherwise their
+	// listener + per-conn reader goroutines (and the client's kept-alive
+	// transport readers) count against us and trip the leak check. The
+	// deferred Close()s above stay as safety nets.
+	appSrv.Close()
+	helixSrv.Close()
+	for _, fs := range servers {
+		fs.server.Close()
+	}
+	http.DefaultClient.CloseIdleConnections()
+
+	// Verify no major goroutine leak. Reaping isn't perfectly synchronous
+	// under -race, so poll until we're under the tolerance or a 2s
+	// deadline fires.
 	tolerance := 5
 	if runtime.GOOS == "windows" {
 		tolerance = 20
@@ -376,10 +386,8 @@ func TestE2E_ThreeChannelFanIn(t *testing.T) {
 		time.Sleep(25 * time.Millisecond)
 	}
 	if final > baselineGoroutines+tolerance {
-		buf := make([]byte, 1<<16)
-		n := runtime.Stack(buf, true)
-		t.Fatalf("goroutine leak: baseline=%d final=%d (tolerance=%d, goos=%s)\n\nstacks:\n%s",
-			baselineGoroutines, final, tolerance, runtime.GOOS, buf[:n])
+		t.Fatalf("goroutine leak: baseline=%d final=%d (tolerance=%d, goos=%s)",
+			baselineGoroutines, final, tolerance, runtime.GOOS)
 	}
 }
 
