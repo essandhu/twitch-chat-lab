@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LandingView } from './App'
@@ -147,5 +147,67 @@ describe('App / LandingView — no session', () => {
     expect(getByText('phase 01 · foundation')).toBeInTheDocument()
     // No <main> grid in the disconnected view.
     expect(container.querySelector('main')).toBeNull()
+  })
+})
+
+describe('App / LandingView — demo mode', () => {
+  const originalSearch = window.location.search
+
+  beforeEach(() => {
+    useChatStore.setState({ session: null })
+    usePerfStore.getState().reset()
+  })
+
+  afterEach(() => {
+    window.history.replaceState({}, '', `/${originalSearch}`)
+    useChatStore.setState({ session: null })
+    usePerfStore.getState().reset()
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
+  it('on ?demo=playwright: renders the DemoBanner, skips ConnectForm, triggers startDemoSession', async () => {
+    const startDemoSession = vi.fn().mockResolvedValue(undefined)
+    vi.doMock('./features/auth/demoSession', () => ({ startDemoSession }))
+    vi.resetModules()
+    window.history.replaceState({}, '', '/?demo=playwright')
+
+    const { LandingView: ReloadedLanding } = await import('./App')
+    render(
+      <MemoryRouter>
+        <ReloadedLanding />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('status', { name: /demo mode/i })).toBeInTheDocument()
+    expect(screen.queryByLabelText(/twitch channel login/i)).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(startDemoSession).toHaveBeenCalledOnce()
+    })
+    expect(startDemoSession).toHaveBeenCalledWith({
+      channel: 'demouser',
+      userId: '99999999',
+      token: 'PLAYWRIGHT_FIXTURE_TOKEN',
+      mode: 'fixture',
+    })
+  })
+
+  it('on ?demo=1 with missing env vars: renders the misconfig notice and still allows ConnectForm', async () => {
+    vi.stubEnv('VITE_DEMO_CHANNEL', '')
+    vi.stubEnv('VITE_DEMO_USER_ID', '')
+    vi.stubEnv('VITE_DEMO_TOKEN', '')
+    window.history.replaceState({}, '', '/?demo=1')
+
+    vi.resetModules()
+    const { LandingView: ReloadedLanding } = await import('./App')
+    render(
+      <MemoryRouter>
+        <ReloadedLanding />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText(/demo mode not configured/i)).toBeInTheDocument()
+    // ConnectForm remains available as a fallback.
+    expect(screen.getByLabelText(/twitch channel login/i)).toBeInTheDocument()
   })
 })

@@ -32,15 +32,32 @@ const parseFragment = (fragment: string): URLSearchParams => {
   return new URLSearchParams(stripped)
 }
 
+const DEMO_TOKEN_TTL_SECONDS = 24 * 60 * 60
+
 export class TwitchAuthService {
   private config: AuthServiceConfig
   private token: string | null = null
   private expiresAt = 0
+  private userId: string | null = null
   private reAuthHandler: (() => void) | null = null
   private validateTimer: ReturnType<typeof setInterval> | null = null
 
   constructor(config: AuthServiceConfig) {
     this.config = config
+  }
+
+  useDemoToken(token: string, userId: string): void {
+    // Seed the token in memory without scheduling /oauth2/validate polling.
+    // A stale demo token must surface as a UI banner — re-auth would lose the
+    // demo session entirely because demo mode does not have an OAuth fallback.
+    this.stopValidationPolling()
+    this.setToken(token, DEMO_TOKEN_TTL_SECONDS)
+    this.userId = userId
+    logger.info('auth.demo.seeded')
+  }
+
+  getUserId(): string | null {
+    return this.userId
   }
 
   authorize(): void {

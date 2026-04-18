@@ -2,43 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { logger } from '../../lib/logger'
 import { useChatStore } from '../../store/chatStore'
-import type { BadgeMap, StreamSession } from '../../types/twitch'
 import { eventSubManager, twitchAuthService, twitchHelixClient } from './authServices'
 import { PENDING_CHANNEL_KEY } from './ConnectForm'
+import { buildSession, mergeBadges } from './sessionBootstrap'
 
 type CallbackStatus =
   | { kind: 'pending' }
   | { kind: 'error'; message: string }
   | { kind: 'connected' }
-
-const mergeBadges = (global: BadgeMap, channel: BadgeMap): BadgeMap => {
-  const merged: BadgeMap = { ...global }
-  for (const [setId, versions] of Object.entries(channel)) {
-    merged[setId] = { ...(merged[setId] ?? {}), ...versions }
-  }
-  return merged
-}
-
-const buildSession = (
-  broadcaster: { id: string; login: string; display_name: string },
-  stream: {
-    title: string
-    game_name: string
-    game_id: string
-    viewer_count: number
-    started_at: string
-  } | null,
-): StreamSession => ({
-  broadcasterId: broadcaster.id,
-  broadcasterLogin: broadcaster.login,
-  broadcasterDisplayName: broadcaster.display_name,
-  streamTitle: stream?.title ?? '',
-  gameName: stream?.game_name ?? '',
-  gameId: stream?.game_id ?? '',
-  viewerCount: stream?.viewer_count ?? 0,
-  startedAt: stream?.started_at ? new Date(stream.started_at) : new Date(0),
-  isConnected: true,
-})
 
 export const AuthCallback = () => {
   const navigate = useNavigate()
