@@ -15,6 +15,7 @@ import (
 	"github.com/erick/twitch-chat-lab/proxy/internal/config"
 	"github.com/erick/twitch-chat-lab/proxy/internal/eventsub"
 	"github.com/erick/twitch-chat-lab/proxy/internal/logger"
+	"github.com/erick/twitch-chat-lab/proxy/internal/upstream"
 )
 
 // postSessionTimeout bounds the entire POST /session handler — including
@@ -27,9 +28,23 @@ const postSessionTimeout = 10 * time.Second
 // spec body validation rules.
 const maxChannelsPerSession = 3
 
+// orphanSessionTimeout is how long a newly-created session may sit in the
+// registry without a /ws connection before the reaper removes it. This
+// protects against clients that POST /session but never follow up with
+// /ws/:id (tab closed, nav-away, network blip) — each such orphan would
+// otherwise hold its upstream EventSub WS transport slot indefinitely.
+// 30s is generous for a post-201 round-trip while short enough that a
+// single orphan does not visibly delay the next demo visitor.
+const orphanSessionTimeout = 30 * time.Second
+
 // SessionHandlerDeps bundles everything RegisterSessionRoutes needs to mount
-// POST /session and DELETE /session/:id. The OpenConn seam lets tests inject
-// fake upstream Conns; in production defaultOpenConn wraps eventsub.Open.
+// POST /session and DELETE /session/:id. The Subscribe seam lets tests
+// inject a fake upstream hub; in production Hub is wired by main.
+//
+// OpenConn remains as a narrower seam so handler_test can still exercise
+// the path without plumbing a full Hub — it takes precedence over Subscribe
+// when set, and is the legacy hook from Phase 4. Subscribe is preferred
+// for new code because it reflects the real shared-pool semantics.
 type SessionHandlerDeps struct {
 	Registry     *aggregator.Registry
 	Logger       *slog.Logger
@@ -38,7 +53,19 @@ type SessionHandlerDeps struct {
 	HelixBaseURL string
 	ValidateURL  string
 	EventSubURL  string
-	OpenConn     func(ctx context.Context, params eventsub.OpenParams) (aggregator.Conn, error)
+	Hub          *upstream.Hub
+
+	// OpenConn and Subscribe are mutually exclusive test seams. Exactly
+	// one is consulted: Subscribe (preferred) if set, else OpenConn, else
+	// the default wire-up using Hub. Subscribe returns aggregator.Conn so
+	// unit tests can stub with a fake conn without constructing a full
+	// upstream.Hub + pool.
+	OpenConn  func(ctx context.Context, params eventsub.OpenParams) (aggregator.Conn, error)
+	Subscribe func(ctx context.Context, params upstream.SubscribeParams) (aggregator.Conn, error)
+
+	// OrphanTimeout overrides orphanSessionTimeout. Zero falls back to the
+	// package default.
+	OrphanTimeout time.Duration
 }
 
 // sessionRequest is the JSON body accepted by POST /session.
@@ -63,11 +90,27 @@ func defaultOpenConn(ctx context.Context, params eventsub.OpenParams) (aggregato
 // the provided router. All mutable state is captured via deps so this
 // function can be called multiple times during tests without aliasing bugs.
 func RegisterSessionRoutes(r gin.IRouter, deps SessionHandlerDeps) {
-	if deps.OpenConn == nil {
-		deps.OpenConn = defaultOpenConn
-	}
 	if deps.HTTPClient == nil {
 		deps.HTTPClient = http.DefaultClient
+	}
+	if deps.Subscribe == nil && deps.OpenConn == nil && deps.Hub != nil {
+		hub := deps.Hub
+		deps.Subscribe = func(ctx context.Context, params upstream.SubscribeParams) (aggregator.Conn, error) {
+			sub, err := hub.Subscribe(ctx, params)
+			if err != nil {
+				return nil, err
+			}
+			return sub, nil
+		}
+	}
+	if deps.Subscribe == nil && deps.OpenConn == nil {
+		// Last-ditch fallback: open a fresh dedicated connection per channel.
+		// Present so handler_test cases that set neither seam still work, but
+		// this path does NOT benefit from the shared-pool quota fix.
+		deps.OpenConn = defaultOpenConn
+	}
+	if deps.OrphanTimeout <= 0 {
+		deps.OrphanTimeout = orphanSessionTimeout
 	}
 
 	r.POST("/session", func(c *gin.Context) {
@@ -156,23 +199,20 @@ func handlePostSession(c *gin.Context, deps SessionHandlerDeps) {
 		return
 	}
 
-	// Build session + open conns.
+	// Build session + wire upstream subscriptions.
 	sessionID := uuid.NewString()
 	sess := aggregator.NewSession(context.Background(), sessionID, req.UserID, req.Channels, deps.Logger)
 
-	type opened struct {
-		conn      aggregator.Conn
-		subIDs    []string
-		streamLog string
+	// attached tracks everything we've wired up so far, so a mid-loop
+	// failure can tear down cleanly without leaking upstream resources.
+	type attached struct {
+		conn        aggregator.Conn
+		streamLogin string
 	}
-	var openedList []opened
+	var attachedList []attached
 	teardown := func() {
-		// Revoke any subscriptions and close any conns we opened so far.
-		for _, op := range openedList {
-			if len(op.subIDs) > 0 {
-				_ = eventsub.Unsubscribe(context.Background(), deps.HTTPClient, deps.HelixBaseURL, clientID, req.AccessToken, op.subIDs)
-			}
-			_ = op.conn.Close()
+		for _, a := range attachedList {
+			_ = a.conn.Close()
 		}
 	}
 
@@ -191,57 +231,75 @@ func handlePostSession(c *gin.Context, deps SessionHandlerDeps) {
 			}
 		}, deps.Logger)
 
-		openParams := eventsub.OpenParams{
-			URL:         deps.EventSubURL,
-			StreamLogin: login,
-			OnFrame:     frameHook,
-			Logger:      deps.Logger,
+		var (
+			attachedConn aggregator.Conn
+			err          error
+		)
+		switch {
+		case deps.Subscribe != nil:
+			conn, subErr := deps.Subscribe(ctx, upstream.SubscribeParams{
+				StreamLogin:   login,
+				UserID:        req.UserID,
+				BroadcasterID: broadcasterIDs[login],
+				AccessToken:   req.AccessToken,
+				OnFrame:       frameHook,
+			})
+			if subErr != nil {
+				err = subErr
+			} else {
+				attachedConn = conn
+			}
+		default:
+			openParams := eventsub.OpenParams{
+				URL:         deps.EventSubURL,
+				StreamLogin: login,
+				OnFrame:     frameHook,
+				Logger:      deps.Logger,
+			}
+			conn, openErr := deps.OpenConn(ctx, openParams)
+			if openErr != nil {
+				err = openErr
+				break
+			}
+			if regErr := registerLegacy(ctx, deps, req, login, broadcasterIDs[login], conn, clientID); regErr != nil {
+				_ = conn.Close()
+				err = regErr
+				break
+			}
+			attachedConn = conn
 		}
-		conn, err := deps.OpenConn(ctx, openParams)
-		if err != nil {
-			log.Error("session.open.error",
-				"streamLogin", login,
-				"error", err.Error(),
-			)
-			teardown()
-			sess.Stop()
-			c.JSON(http.StatusBadGateway, gin.H{"error": "upstream_failed"})
-			return
-		}
-
-		regRes, err := eventsub.Register(ctx, eventsub.RegisterArgs{
-			HTTPClient:    deps.HTTPClient,
-			HelixBaseURL:  deps.HelixBaseURL,
-			ClientID:      clientID,
-			AccessToken:   req.AccessToken,
-			SessionID:     conn.SessionID(),
-			BroadcasterID: broadcasterIDs[login],
-			UserID:        req.UserID,
-			StreamLogin:   login,
-			Logger:        deps.Logger,
-		})
 		if err != nil {
 			log.Error("session.subscribe.error",
 				"streamLogin", login,
 				"error", err.Error(),
 			)
-			_ = conn.Close()
 			teardown()
 			sess.Stop()
 			c.JSON(http.StatusBadGateway, gin.H{"error": "upstream_failed"})
 			return
 		}
-
-		subIDs := make([]string, 0, len(regRes.Registered))
-		for _, reg := range regRes.Registered {
-			subIDs = append(subIDs, reg.SubscriptionID)
-		}
-		openedList = append(openedList, opened{conn: conn, subIDs: subIDs, streamLog: login})
-		sess.AttachConn(login, conn)
+		attachedList = append(attachedList, attached{conn: attachedConn, streamLogin: login})
+		sess.AttachConn(login, attachedConn)
 	}
 
 	sess.Start()
 	deps.Registry.Add(sess)
+
+	// Orphan reaper: if the client never establishes /ws/:id, tear the
+	// session down so its upstream subscriptions are released and the
+	// Twitch per-user WS transport slot is returned. TryAcquireWS inside
+	// the /ws handler cancels this timer atomically.
+	registry := deps.Registry
+	logger := deps.Logger
+	sess.StartOrphanTimer(deps.OrphanTimeout, func() {
+		registry.Remove(sessionID)
+		if logger != nil {
+			logger.Warn("session.orphaned",
+				"sessionId", sessionID,
+				"timeoutSec", int(deps.OrphanTimeout.Seconds()),
+			)
+		}
+	})
 
 	log.Info("session.create",
 		"sessionId", sessionID,
@@ -249,6 +307,23 @@ func handlePostSession(c *gin.Context, deps SessionHandlerDeps) {
 		"streamLogins", req.Channels,
 	)
 	c.JSON(http.StatusCreated, gin.H{"session_id": sessionID})
+}
+
+// registerLegacy performs the original (non-Hub) Register flow so the
+// OpenConn test seam still works. Hub.Subscribe handles Register internally.
+func registerLegacy(ctx context.Context, deps SessionHandlerDeps, req sessionRequest, login, broadcasterID string, conn aggregator.Conn, clientID string) error {
+	_, err := eventsub.Register(ctx, eventsub.RegisterArgs{
+		HTTPClient:    deps.HTTPClient,
+		HelixBaseURL:  deps.HelixBaseURL,
+		ClientID:      clientID,
+		AccessToken:   req.AccessToken,
+		SessionID:     conn.SessionID(),
+		BroadcasterID: broadcasterID,
+		UserID:        req.UserID,
+		StreamLogin:   login,
+		Logger:        deps.Logger,
+	})
+	return err
 }
 
 // handleDeleteSession tears down a known session. Unknown ids return 404

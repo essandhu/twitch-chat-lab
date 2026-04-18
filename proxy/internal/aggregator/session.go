@@ -50,24 +50,63 @@ type Session struct {
 	cancel context.CancelFunc
 	logger *slog.Logger
 
-	mu       sync.Mutex
-	conns    []attachedConn
-	started  bool
-	stopped  bool
-	wsActive bool
-	wg       sync.WaitGroup
-	stopCh   chan struct{}
+	mu             sync.Mutex
+	conns          []attachedConn
+	started        bool
+	stopped        bool
+	wsActive       bool
+	orphanTimer    *time.Timer
+	orphanCanceled bool
+	wg             sync.WaitGroup
+	stopCh         chan struct{}
+}
+
+// StartOrphanTimer schedules onExpire after d if TryAcquireWS has not been
+// called by then. Called once by the POST /session handler right before
+// returning the session id to the client; if the client never follows up
+// with a /ws connect, the reaper fires and the handler tears the session
+// down so the upstream EventSub WebSocket transport slot is returned.
+// Safe to call at most once per session. No-op if already stopped.
+func (s *Session) StartOrphanTimer(d time.Duration, onExpire func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.stopped || s.wsActive || s.orphanTimer != nil || s.orphanCanceled {
+		return
+	}
+	s.orphanTimer = time.AfterFunc(d, func() {
+		s.mu.Lock()
+		if s.orphanCanceled {
+			s.mu.Unlock()
+			return
+		}
+		s.orphanCanceled = true
+		s.orphanTimer = nil
+		s.mu.Unlock()
+		onExpire()
+	})
 }
 
 // TryAcquireWS atomically claims the single downstream WebSocket slot for
-// this session. Returns true on success, false if another client already
-// holds it. Use ReleaseWS when the WebSocket closes so reconnects can
-// reattach.
+// this session AND cancels the orphan reaper (if any). Returns true on
+// success, false if another client already holds the slot or the orphan
+// reaper has already fired. Use ReleaseWS when the WebSocket closes so
+// reconnects can reattach.
 func (s *Session) TryAcquireWS() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.wsActive {
 		return false
+	}
+	// The orphan reaper and WS acquisition race: if the timer already fired
+	// (orphanCanceled=true with the session about to be removed), we must
+	// refuse the acquire so the client reconnects to a fresh session.
+	if s.orphanCanceled && s.orphanTimer == nil {
+		return false
+	}
+	if s.orphanTimer != nil {
+		s.orphanTimer.Stop()
+		s.orphanTimer = nil
+		s.orphanCanceled = true
 	}
 	s.wsActive = true
 	return true
@@ -196,6 +235,11 @@ func (s *Session) Stop() {
 		return
 	}
 	s.stopped = true
+	if s.orphanTimer != nil {
+		s.orphanTimer.Stop()
+		s.orphanTimer = nil
+		s.orphanCanceled = true
+	}
 	conns := make([]attachedConn, len(s.conns))
 	copy(conns, s.conns)
 	s.mu.Unlock()

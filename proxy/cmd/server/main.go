@@ -16,6 +16,7 @@ import (
 	"github.com/erick/twitch-chat-lab/proxy/internal/api"
 	"github.com/erick/twitch-chat-lab/proxy/internal/config"
 	"github.com/erick/twitch-chat-lab/proxy/internal/logger"
+	"github.com/erick/twitch-chat-lab/proxy/internal/upstream"
 )
 
 const (
@@ -39,11 +40,22 @@ func main() {
 	// Shared registry holds every live downstream session. Handlers Add,
 	// WebSocket pump and shutdown Remove/CloseAll.
 	registry := aggregator.NewRegistry()
+
+	// Process-wide upstream hub: pools EventSub WS connections by
+	// (stream_login, user_id) so we stay under Twitch's 3-transport-per-
+	// user cap even with many concurrent viewers on the demo.
+	hub := upstream.NewHub(upstream.HubConfig{
+		ClientID:   cfg.ClientID,
+		HTTPClient: http.DefaultClient,
+		Logger:     log,
+	})
+
 	api.RegisterSessionRoutes(router, api.SessionHandlerDeps{
 		Registry:   registry,
 		Logger:     log,
 		Config:     cfg,
 		HTTPClient: http.DefaultClient,
+		Hub:        hub,
 	})
 	api.RegisterWebSocketRoute(router, api.WebSocketHandlerDeps{
 		Registry: registry,
@@ -93,5 +105,6 @@ func main() {
 		// don't want EventSub sockets leaking past the process exit path.
 	}
 	registry.CloseAll()
+	hub.Shutdown()
 	log.Info("server.shutdown.complete")
 }
