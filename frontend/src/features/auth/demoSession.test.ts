@@ -4,6 +4,7 @@ import type { HelixStream, HelixUser } from '../../types/twitch'
 const helixMock = vi.hoisted(() => ({
   getUser: vi.fn(),
   getStream: vi.fn(),
+  getStreamsByCategory: vi.fn(),
   getGlobalBadges: vi.fn(),
   getChannelBadges: vi.fn(),
 }))
@@ -50,6 +51,7 @@ describe('startDemoSession', () => {
   beforeEach(() => {
     helixMock.getUser.mockReset()
     helixMock.getStream.mockReset()
+    helixMock.getStreamsByCategory.mockReset()
     helixMock.getGlobalBadges.mockReset()
     helixMock.getChannelBadges.mockReset()
     eventSubMock.connect.mockReset().mockResolvedValue(undefined)
@@ -143,6 +145,57 @@ describe('startDemoSession', () => {
         mode: 'cached',
       }),
     ).rejects.toThrow(/missing/)
+    expect(eventSubMock.connect).not.toHaveBeenCalled()
+  })
+
+  it('picks a live channel from Helix when config.channel is omitted (cached mode)', async () => {
+    helixMock.getStreamsByCategory.mockResolvedValue([
+      helixStream('b-live', 'livechannel'),
+    ])
+    helixMock.getUser.mockResolvedValue(helixUser('livechannel', 'b-live'))
+    helixMock.getStream.mockResolvedValue(helixStream('b-live', 'livechannel'))
+    helixMock.getGlobalBadges.mockResolvedValue({})
+    helixMock.getChannelBadges.mockResolvedValue({})
+
+    await startDemoSession({ userId: 'u-99', token: 'demo-token', mode: 'cached' })
+
+    // Just Chatting category id, 20 candidates.
+    expect(helixMock.getStreamsByCategory).toHaveBeenCalledWith('509658', 20)
+    expect(helixMock.getUser).toHaveBeenCalledWith('livechannel')
+    expect(useChatStore.getState().session?.broadcasterLogin).toBe('livechannel')
+  })
+
+  it('skips streams with empty user_login and picks the first valid one', async () => {
+    helixMock.getStreamsByCategory.mockResolvedValue([
+      { ...helixStream('b-empty', ''), user_login: '' },
+      helixStream('b-second', 'secondpick'),
+    ])
+    helixMock.getUser.mockResolvedValue(helixUser('secondpick', 'b-second'))
+    helixMock.getStream.mockResolvedValue(helixStream('b-second', 'secondpick'))
+    helixMock.getGlobalBadges.mockResolvedValue({})
+    helixMock.getChannelBadges.mockResolvedValue({})
+
+    await startDemoSession({ userId: 'u-99', token: 'demo-token', mode: 'cached' })
+
+    expect(helixMock.getUser).toHaveBeenCalledWith('secondpick')
+  })
+
+  it('throws when Helix returns zero live streams and does NOT connect', async () => {
+    helixMock.getStreamsByCategory.mockResolvedValue([])
+
+    await expect(
+      startDemoSession({ userId: 'u-99', token: 'demo-token', mode: 'cached' }),
+    ).rejects.toThrow(/no live demo channel/)
+    expect(helixMock.getUser).not.toHaveBeenCalled()
+    expect(eventSubMock.connect).not.toHaveBeenCalled()
+  })
+
+  it('propagates Helix errors from the live-stream query (no static fallback)', async () => {
+    helixMock.getStreamsByCategory.mockRejectedValue(new Error('helix 500'))
+
+    await expect(
+      startDemoSession({ userId: 'u-99', token: 'demo-token', mode: 'cached' }),
+    ).rejects.toThrow(/helix 500/)
     expect(eventSubMock.connect).not.toHaveBeenCalled()
   })
 })

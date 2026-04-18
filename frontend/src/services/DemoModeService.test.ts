@@ -49,29 +49,19 @@ describe('DemoModeService', () => {
       expect(getDemoConfig()).toBeNull()
     })
 
-    it('returns cached config from env vars for ?demo=1 when all three vars are set', () => {
-      vi.stubEnv('VITE_DEMO_CHANNEL', 'demostreamer')
+    it('returns cached config (no channel) for ?demo=1 when user id + token are set', () => {
       vi.stubEnv('VITE_DEMO_USER_ID', '12345678')
       vi.stubEnv('VITE_DEMO_TOKEN', 'token-abc')
       setSearch('?demo=1')
+      // Channel is picked at runtime by a live Helix query — not from env.
       expect(getDemoConfig()).toEqual({
-        channel: 'demostreamer',
         userId: '12345678',
         token: 'token-abc',
         mode: 'cached',
       })
     })
 
-    it('returns null for ?demo=1 when VITE_DEMO_CHANNEL is missing', () => {
-      vi.stubEnv('VITE_DEMO_CHANNEL', '')
-      vi.stubEnv('VITE_DEMO_USER_ID', '12345678')
-      vi.stubEnv('VITE_DEMO_TOKEN', 'token-abc')
-      setSearch('?demo=1')
-      expect(getDemoConfig()).toBeNull()
-    })
-
     it('returns null for ?demo=1 when VITE_DEMO_USER_ID is missing', () => {
-      vi.stubEnv('VITE_DEMO_CHANNEL', 'demostreamer')
       vi.stubEnv('VITE_DEMO_USER_ID', '')
       vi.stubEnv('VITE_DEMO_TOKEN', 'token-abc')
       setSearch('?demo=1')
@@ -79,7 +69,6 @@ describe('DemoModeService', () => {
     })
 
     it('returns null for ?demo=1 when VITE_DEMO_TOKEN is missing', () => {
-      vi.stubEnv('VITE_DEMO_CHANNEL', 'demostreamer')
       vi.stubEnv('VITE_DEMO_USER_ID', '12345678')
       vi.stubEnv('VITE_DEMO_TOKEN', '')
       setSearch('?demo=1')
@@ -87,7 +76,6 @@ describe('DemoModeService', () => {
     })
 
     it('returns fixture config for ?demo=playwright regardless of env vars', () => {
-      vi.stubEnv('VITE_DEMO_CHANNEL', '')
       vi.stubEnv('VITE_DEMO_USER_ID', '')
       vi.stubEnv('VITE_DEMO_TOKEN', '')
       setSearch('?demo=playwright')

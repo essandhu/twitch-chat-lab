@@ -25,6 +25,15 @@ const DemoMisconfigNotice = () => (
   </div>
 )
 
+const DemoUnavailableNotice = () => (
+  <div
+    role="alert"
+    className="mb-8 max-w-md border border-ember-500/40 bg-ink-900/70 p-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ember-500"
+  >
+    Demo unavailable — couldn't find a live channel. Try again in a moment.
+  </div>
+)
+
 export const LandingView = () => {
   const session = useChatStore((s) => s.session)
   const firstTimerCount = useChatStore((s) => s.firstTimers.length)
@@ -35,6 +44,7 @@ export const LandingView = () => {
   // Stable config reference per mount — DemoModeService is pure so re-reads are cheap
   // but we avoid re-running the effect on every render.
   const demoConfig = useMemo(() => (demoMode ? getDemoConfig() : null), [demoMode])
+  const [demoFailed, setDemoFailed] = useState(false)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -50,9 +60,11 @@ export const LandingView = () => {
   useEffect(() => {
     if (!demoConfig) return
     let cancelled = false
+    setDemoFailed(false)
     void startDemoSession(demoConfig).catch((err) => {
       if (cancelled) return
       logger.error('demo.connect_failed', { error: String(err) })
+      setDemoFailed(true)
     })
     return () => {
       cancelled = true
@@ -60,7 +72,7 @@ export const LandingView = () => {
   }, [demoConfig])
 
   if (!session) {
-    const demoConnecting = demoMode && demoConfig !== null
+    const demoConnecting = demoMode && demoConfig !== null && !demoFailed
     return (
       <div className="relative flex min-h-screen flex-col">
         {demoConnecting && (
@@ -80,6 +92,7 @@ export const LandingView = () => {
           ) : (
             <div className="flex flex-col items-center">
               {demoMode && !demoConfig && <DemoMisconfigNotice />}
+              {demoMode && demoConfig && demoFailed && <DemoUnavailableNotice />}
               <ConnectForm />
             </div>
           )}

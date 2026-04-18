@@ -9,7 +9,10 @@
 export type DemoMode = 'cached' | 'fixture'
 
 export interface DemoConfig {
-  channel: string
+  // Only set for `fixture` mode (Playwright). For `cached` mode the channel
+  // is picked at runtime from a live Helix /streams query so the demo never
+  // points at an offline broadcaster.
+  channel?: string
   userId: string
   token: string
   mode: DemoMode
@@ -42,9 +45,8 @@ export const getDemoConfig = (): DemoConfig | null => {
   if (value === 'playwright') return PLAYWRIGHT_FIXTURE
   if (value !== '1') return null
 
-  const channel = readEnv('VITE_DEMO_CHANNEL')
   const userId = readEnv('VITE_DEMO_USER_ID')
   const token = readEnv('VITE_DEMO_TOKEN')
-  if (!channel || !userId || !token) return null
-  return { channel, userId, token, mode: 'cached' }
+  if (!userId || !token) return null
+  return { userId, token, mode: 'cached' }
 }

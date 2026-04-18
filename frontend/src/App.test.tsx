@@ -193,7 +193,6 @@ describe('App / LandingView — demo mode', () => {
   })
 
   it('on ?demo=1 with missing env vars: renders the misconfig notice and still allows ConnectForm', async () => {
-    vi.stubEnv('VITE_DEMO_CHANNEL', '')
     vi.stubEnv('VITE_DEMO_USER_ID', '')
     vi.stubEnv('VITE_DEMO_TOKEN', '')
     window.history.replaceState({}, '', '/?demo=1')
@@ -208,6 +207,28 @@ describe('App / LandingView — demo mode', () => {
 
     expect(screen.getByText(/demo mode not configured/i)).toBeInTheDocument()
     // ConnectForm remains available as a fallback.
+    expect(screen.getByLabelText(/twitch channel login/i)).toBeInTheDocument()
+  })
+
+  it('renders the "demo unavailable" notice when startDemoSession rejects', async () => {
+    const startDemoSession = vi
+      .fn()
+      .mockRejectedValue(new Error('no live demo channel available'))
+    vi.doMock('./features/auth/demoSession', () => ({ startDemoSession }))
+    vi.resetModules()
+    window.history.replaceState({}, '', '/?demo=playwright')
+
+    const { LandingView: ReloadedLanding } = await import('./App')
+    render(
+      <MemoryRouter>
+        <ReloadedLanding />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/demo unavailable/i)
+    })
+    // No static fallback — ConnectForm is still offered beneath the error.
     expect(screen.getByLabelText(/twitch channel login/i)).toBeInTheDocument()
   })
 })

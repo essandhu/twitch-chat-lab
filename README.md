@@ -44,7 +44,7 @@ go run ./cmd/server     # port 8080
 
 Open `http://localhost:5173`. Enter a Twitch channel login, complete OAuth, and chat streams in.
 
-For **local demo mode** (skip OAuth), set `VITE_DEMO_CHANNEL`, `VITE_DEMO_USER_ID`, and `VITE_DEMO_TOKEN` in `frontend/.env` and open `http://localhost:5173/?demo=1`.
+For **local demo mode** (skip OAuth), set `VITE_DEMO_USER_ID` and `VITE_DEMO_TOKEN` in `frontend/.env` and open `http://localhost:5173/?demo=1`. The channel is picked at runtime from Twitch's live "Just Chatting" streams, so the demo never lands on an offline broadcaster.
 
 ### Test suites
 
