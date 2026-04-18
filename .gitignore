@@ -18,3 +18,6 @@ frontend/test-results/
 proxy/server
 proxy/server.exe
 proxy/.gotmp/
+
+# Internal planning / review docs
+docs/
