@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useChatStore } from './store/chatStore'
 import { useMultiStreamStore } from './store/multiStreamStore'
@@ -57,8 +57,15 @@ export const LandingView = () => {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
+  // StrictMode double-invokes effects in dev; startDemoSession is not
+  // idempotent (resetForNewChannel wipes chatStore), so guard with a ref so
+  // the second invocation no-ops. The query-param-derived demoConfig doesn't
+  // change during a session, so this is effectively a once-per-session gate.
+  const demoStartedRef = useRef(false)
   useEffect(() => {
     if (!demoConfig) return
+    if (demoStartedRef.current) return
+    demoStartedRef.current = true
     let cancelled = false
     setDemoFailed(false)
     void startDemoSession(demoConfig).catch((err) => {
