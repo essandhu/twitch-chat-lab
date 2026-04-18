@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -17,6 +18,26 @@ import (
 	"github.com/erick/twitch-chat-lab/proxy/internal/config"
 	"github.com/erick/twitch-chat-lab/proxy/internal/upstream"
 )
+
+// syncBuf is a concurrency-safe bytes.Buffer wrapper. The orphan reaper logs
+// from background goroutines while the test reads the buffer — a plain
+// bytes.Buffer is not safe for concurrent use and trips the race detector.
+type syncBuf struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuf) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuf) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
 
 // inertConn is a minimal aggregator.Conn used by the orphan-reaper handler
 // test. Run blocks until Close; nothing emits frames.
@@ -69,7 +90,7 @@ func orphanStubHelix(t *testing.T) *httptest.Server {
 func TestPostSession_OrphanReaperRemovesUnconnectedSession(t *testing.T) {
 	helix := orphanStubHelix(t)
 
-	var buf bytes.Buffer
+	var buf syncBuf
 	log := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	cfg := &config.Config{ClientID: "client-test", Port: "0"}
 	r := api.BuildRouter(cfg, log)
