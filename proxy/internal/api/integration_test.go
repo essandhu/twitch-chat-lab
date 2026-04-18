@@ -359,16 +359,21 @@ func TestE2E_ThreeChannelFanIn(t *testing.T) {
 
 	// Verify no major goroutine leak. httptest keeps a pool alive and slog
 	// may retain a worker or two, so we allow a small band above baseline.
-	time.Sleep(150 * time.Millisecond)
-	final := runtime.NumGoroutine()
-	// Phase 5 D12: Linux CI with -race reaps goroutines deterministically,
-	// so we tighten to +5. Windows sandboxes can't run -race (no CGO) and
-	// show ~11 stragglers from httptest worker pools + goroutine pinning;
-	// keep +20 there so local dev isn't blocked. If Linux CI still trips
-	// this, leave +5 and investigate the specific leak.
+	// Reaping isn't perfectly synchronous on Linux CI under -race (observed
+	// ~11 stragglers 150ms after DELETE), so poll until we're under the
+	// tolerance or a 2s deadline fires.
 	tolerance := 5
 	if runtime.GOOS == "windows" {
 		tolerance = 20
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	final := runtime.NumGoroutine()
+	for time.Now().Before(deadline) {
+		final = runtime.NumGoroutine()
+		if final <= baselineGoroutines+tolerance {
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
 	}
 	if final > baselineGoroutines+tolerance {
 		t.Fatalf("goroutine leak: baseline=%d final=%d (tolerance=%d, goos=%s)",
