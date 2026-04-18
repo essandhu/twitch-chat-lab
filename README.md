@@ -4,9 +4,9 @@ A high-throughput Twitch chat interface with engagement instrumentation, smart f
 
 ## Live demo
 
-**https://&lt;vercel-app&gt;.vercel.app/?demo=1**
+**https://twitch-chat-lab.vercel.app/?demo=1**
 
-No login required — read-only demo against a popular live channel. _(Replace the placeholder above with the deployed Vercel URL once Phase 5 deploys complete.)_
+No login required — read-only demo against a popular live channel.
 
 ## Features
 
@@ -27,50 +27,6 @@ No login required — read-only demo against a popular live channel. _(Replace t
 | **Heap** | `performance.memory.usedJSHeapSize / 1 MB` (Chromium only; `n/a` elsewhere) | < 200 MB; amber above |
 | **EventSub latency** | `Date.now() - metadata.message_timestamp`, exponentially smoothed | < 500 ms; amber above. Measures browser→Twitch round-trip. |
 
-## Local dev
-
-```bash
-# Frontend
-cd frontend
-cp .env.example .env    # fill in VITE_TWITCH_CLIENT_ID; others have sane defaults
-npm install
-npm run dev              # port 5173
-
-# Proxy (in another terminal)
-cd proxy
-cp .env.example .env    # fill in TWITCH_CLIENT_ID, ALLOWED_ORIGINS
-go run ./cmd/server     # port 8080
-```
-
-Open `http://localhost:5173`. Enter a Twitch channel login, complete OAuth, and chat streams in.
-
-For **local demo mode** (skip OAuth), set `VITE_DEMO_USER_ID` and `VITE_DEMO_TOKEN` in `frontend/.env` and open `http://localhost:5173/?demo=1`. The channel is picked at runtime from Twitch's live "Just Chatting" streams, so the demo never lands on an offline broadcaster.
-
-### Test suites
-
-```bash
-# Frontend unit + integration (Vitest)
-cd frontend && npm test
-
-# Frontend E2E (Playwright, runs dev server + proxy as needed)
-cd frontend && npm run test:e2e
-
-# Proxy (Go)
-cd proxy && go test -race ./...
-```
-
-CI runs all three on every push to `main` (see `.github/workflows/ci.yml`).
-
-## Twitch app registration
-
-1. Visit `https://dev.twitch.tv/console/apps` and click **Register Your Application**.
-2. Name: anything. Category: **Application Integration**.
-3. **OAuth Redirect URLs** — add both:
-   - `http://localhost:5173/auth/callback` (local dev)
-   - `https://<vercel-app>.vercel.app/auth/callback` (production)
-4. Copy the **Client ID** into `frontend/.env` and `proxy/.env` as `VITE_TWITCH_CLIENT_ID` / `TWITCH_CLIENT_ID`.
-5. **No client secret needed** — this is an Implicit Grant SPA (see Tech decisions below).
-
 ## Tech decisions
 
 ### `@tanstack/react-virtual` over `react-window`
@@ -85,7 +41,7 @@ The only state-consumer pattern in this app is "subscribe to a slice." Zustand d
 
 Three reasons:
 
-1. **Demonstrates Go concurrency** — goroutines per upstream, `chan []byte` fan-in, `context.Context` propagation for cascade teardown, exponential backoff on reconnect.
+1. **Go concurrency primitives fit the problem** — goroutines per upstream, `chan []byte` fan-in, `context.Context` propagation for cascade teardown, exponential backoff on reconnect.
 2. **Single-binary deploy** on Fly.io. ~15 MB distroless image, no Node runtime to configure.
 3. **Fan-in ergonomics.** No Node WebSocket library matches `select { case <-ctx.Done(): … case frame := <-upstream: … }` for multi-source aggregation.
 
@@ -95,7 +51,7 @@ Twitch does **not** support PKCE for Authorization Code Grant (confirmed via Twi
 
 ## Known limitations
 
-- **Demo token rotation.** Implicit Grant has no refresh token. When the cached demo token expires, the live demo breaks until the operator manually generates a new one and redeploys.
-- **First-timer detection is per-session.** EventSub's `channel.chat.message` does not expose `is_first_message` (the old IRC `first-msg` tag was not carried over). We label the UI accordingly — "first this session," not "first ever in channel."
+- **Demo token rotation.** Implicit Grant has no refresh token. When the cached demo token expires, the live demo breaks until it is manually rotated.
+- **First-timer detection is per-session.** EventSub's `channel.chat.message` does not expose `is_first_message` (the old IRC `first-msg` tag was not carried over). The UI labels accordingly — "first this session," not "first ever in channel."
 - **`jsHeapUsedMB` is Chromium-only.** `performance.memory` is a non-standard API. Firefox and Safari show `n/a` with a tooltip.
 - **Non-own-channel viewing degrades to chat-rate-only.** Twitch returns 403 for `channel.subscribe` / `channel.hype_train.*` subscriptions on channels the authed user does not own. The chat feed and heatmap velocity still work; event markers (raids, subs, hype) only appear for your own channel. The UI calls this out.
