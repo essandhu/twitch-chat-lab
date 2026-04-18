@@ -376,8 +376,10 @@ func TestE2E_ThreeChannelFanIn(t *testing.T) {
 		time.Sleep(25 * time.Millisecond)
 	}
 	if final > baselineGoroutines+tolerance {
-		t.Fatalf("goroutine leak: baseline=%d final=%d (tolerance=%d, goos=%s)",
-			baselineGoroutines, final, tolerance, runtime.GOOS)
+		buf := make([]byte, 1<<16)
+		n := runtime.Stack(buf, true)
+		t.Fatalf("goroutine leak: baseline=%d final=%d (tolerance=%d, goos=%s)\n\nstacks:\n%s",
+			baselineGoroutines, final, tolerance, runtime.GOOS, buf[:n])
 	}
 }
 
