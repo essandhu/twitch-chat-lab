@@ -1,24 +1,40 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useChatStore } from './store/chatStore'
 import { useMultiStreamStore } from './store/multiStreamStore'
 import { usePerfStore } from './store/perfStore'
 import { AuthCallback } from './features/auth/AuthCallback'
 import { ConnectForm } from './features/auth/ConnectForm'
+import { twitchAuthService } from './features/auth/authServices'
+import { startDemoSession } from './features/auth/demoSession'
 import { StreamHeader } from './components/StreamHeader'
 import { TabBar } from './components/TabBar'
+import { DemoBanner } from './components/DemoBanner'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ChatPanel } from './features/chat/ChatPanel'
 import { FirstTimerPanel } from './features/firstTimers/FirstTimerPanel'
 import { HeatmapPanel } from './features/heatmap/HeatmapPanel'
 import { MultiStreamLayout } from './features/multiStream/MultiStreamLayout'
 import { PerfOverlay } from './features/perfPanel/PerfOverlay'
+import { getDemoConfig, isDemoMode } from './services/DemoModeService'
+import { logger } from './lib/logger'
+
+const DemoMisconfigNotice = () => (
+  <div className="mb-8 max-w-md border border-ember-500/40 bg-ink-900/70 p-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ember-500">
+    Demo mode not configured — set VITE_DEMO_* in env.
+  </div>
+)
 
 export const LandingView = () => {
   const session = useChatStore((s) => s.session)
   const firstTimerCount = useChatStore((s) => s.firstTimers.length)
   const isMultiActive = useMultiStreamStore((s) => s.isActive)
   const [activeTabId, setActiveTabId] = useState<'chat' | 'firstTimers'>('chat')
+
+  const demoMode = isDemoMode()
+  // Stable config reference per mount — DemoModeService is pure so re-reads are cheap
+  // but we avoid re-running the effect on every render.
+  const demoConfig = useMemo(() => (demoMode ? getDemoConfig() : null), [demoMode])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -31,16 +47,43 @@ export const LandingView = () => {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
+  useEffect(() => {
+    if (!demoConfig) return
+    let cancelled = false
+    void startDemoSession(demoConfig).catch((err) => {
+      if (cancelled) return
+      logger.error('demo.connect_failed', { error: String(err) })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [demoConfig])
+
   if (!session) {
+    const demoConnecting = demoMode && demoConfig !== null
     return (
-      <div className="relative flex min-h-screen items-center justify-center px-6 py-12">
-        <div className="absolute top-10 left-10 font-mono text-[10px] uppercase tracking-[0.4em] text-ink-500">
-          twitch · chat · lab
+      <div className="relative flex min-h-screen flex-col">
+        {demoConnecting && (
+          <DemoBanner onSignIn={() => twitchAuthService.authorize()} />
+        )}
+        <div className="relative flex flex-1 items-center justify-center px-6 py-12">
+          <div className="absolute top-10 left-10 font-mono text-[10px] uppercase tracking-[0.4em] text-ink-500">
+            twitch · chat · lab
+          </div>
+          <div className="absolute bottom-10 right-10 font-mono text-[10px] uppercase tracking-[0.4em] text-ink-500">
+            phase 01 · foundation
+          </div>
+          {demoConnecting ? (
+            <div className="font-mono text-xs uppercase tracking-[0.3em] text-ember-500">
+              Handshaking demo session…
+            </div>
+          ) : (
+            <div className="flex flex-col items-center">
+              {demoMode && !demoConfig && <DemoMisconfigNotice />}
+              <ConnectForm />
+            </div>
+          )}
         </div>
-        <div className="absolute bottom-10 right-10 font-mono text-[10px] uppercase tracking-[0.4em] text-ink-500">
-          phase 01 · foundation
-        </div>
-        <ConnectForm />
       </div>
     )
   }
@@ -52,6 +95,9 @@ export const LandingView = () => {
 
   return (
     <div className="flex h-screen flex-col">
+      {demoMode && demoConfig && (
+        <DemoBanner onSignIn={() => twitchAuthService.authorize()} />
+      )}
       <ErrorBoundary label="Stream header">
         <StreamHeader />
       </ErrorBoundary>

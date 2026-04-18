@@ -425,11 +425,12 @@ drain:
 	// Give the runtime a beat to reap exiting goroutines.
 	time.Sleep(100 * time.Millisecond)
 
-	// Allow some tolerance — slog/gin internals may retain worker goroutines
-	// across tests in the same binary. We check for a hard leak, not a
-	// perfect baseline match.
+	// Target zero leaks. Phase 4 ran +3 on Windows (no -race); Phase 5 D12
+	// retargets baseline on Linux CI where the race detector reaps
+	// deterministically. If this line flakes on a specific CI pipeline,
+	// lift to baseGoroutines+1 and open a ticket — don't paper over real leaks.
 	finalGoroutines := runtime.NumGoroutine()
-	if finalGoroutines > baseGoroutines+3 {
+	if finalGoroutines > baseGoroutines {
 		t.Fatalf("goroutine leak: baseline=%d final=%d", baseGoroutines, finalGoroutines)
 	}
 }

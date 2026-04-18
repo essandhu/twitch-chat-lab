@@ -50,6 +50,7 @@ export function ChatList({ messagesOverride }: ChatListProps = {}): JSX.Element 
       key={item.key}
       ref={virtualizer.measureElement}
       data-index={item.index}
+      data-testid="chat-row"
       style={{
         position: 'absolute',
         top: 0,
@@ -73,7 +74,12 @@ export function ChatList({ messagesOverride }: ChatListProps = {}): JSX.Element 
 
   return (
     <div className="relative h-full">
-      <div ref={parentRef} className="h-full overflow-y-auto" onScroll={handleScroll}>
+      <div
+        ref={parentRef}
+        data-testid="chat-list"
+        className="h-full overflow-y-auto"
+        onScroll={handleScroll}
+      >
         <div
           style={{
             height: virtualizer.getTotalSize(),

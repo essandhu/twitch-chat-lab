@@ -47,7 +47,10 @@ export const FilterToolbar = () => {
       ))}
       <KeywordFilter />
       {activeCount > 0 && (
-        <span className="absolute top-1 right-1 rounded-full bg-ember-500 text-ink-950 text-[10px] font-mono px-1.5 py-0.5">
+        <span
+          data-testid="filter-count"
+          className="absolute top-1 right-1 rounded-full bg-ember-500 text-ink-950 text-[10px] font-mono px-1.5 py-0.5"
+        >
           {activeCount}
         </span>
       )}

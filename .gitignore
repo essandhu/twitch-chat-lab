@@ -8,6 +8,12 @@ coverage/
 .vite/
 .worktrees/
 
+# Playwright artifacts
+playwright-report/
+test-results/
+frontend/playwright-report/
+frontend/test-results/
+
 # Go build + test artifacts
 proxy/server
 proxy/server.exe

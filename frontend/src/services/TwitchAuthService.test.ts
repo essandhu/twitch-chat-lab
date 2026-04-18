@@ -141,4 +141,20 @@ describe('TwitchAuthService', () => {
     service.clearToken()
     expect(service.getToken()).toBeNull()
   })
+
+  it('useDemoToken seeds a token that stays valid and records the demo user id', () => {
+    service.useDemoToken('demo-tok', 'demo-user-123')
+    expect(service.getToken()).toBe('demo-tok')
+    expect(service.getUserId()).toBe('demo-user-123')
+  })
+
+  it('useDemoToken does not start validate polling', () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }))
+    vi.useFakeTimers()
+
+    service.useDemoToken('demo-tok', 'demo-user-123')
+    vi.advanceTimersByTime(10 * 60 * 1000)
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
 })
