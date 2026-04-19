@@ -122,19 +122,24 @@ describe('TopNav', () => {
     expect(document.activeElement).toBe(other)
   })
 
-  it('cycles theme system -> dark -> light -> system on toggle click', async () => {
+  it('toggle flips between dark and light based on resolved theme', async () => {
     const user = userEvent.setup()
     renderNav()
     const toggle = screen.getByLabelText(/theme/i)
 
-    // Start as system
+    // Start as system; matchMedia mock returns matches=false, so resolved=light.
     expect(screen.getByTestId('theme').textContent).toBe('system')
+    expect(screen.getByTestId('resolved').textContent).toBe('light')
+
+    // First click flips to the opposite of resolved — dark.
     await user.click(toggle)
     expect(screen.getByTestId('theme').textContent).toBe('dark')
+
+    // Every subsequent click flips: dark -> light -> dark.
     await user.click(toggle)
     expect(screen.getByTestId('theme').textContent).toBe('light')
     await user.click(toggle)
-    expect(screen.getByTestId('theme').textContent).toBe('system')
+    expect(screen.getByTestId('theme').textContent).toBe('dark')
   })
 
   it('clicking the wordmark navigates to /', async () => {

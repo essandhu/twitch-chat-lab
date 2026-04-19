@@ -5,14 +5,14 @@ export const KeywordFilter = () => {
   const setFilterState = useChatStore((s) => s.setFilterState)
 
   return (
-    <div className="inline-flex items-center border border-border bg-surface">
+    <div className="flex min-w-0 flex-1 basis-full items-center rounded-md border border-border bg-surface">
       <input
         type="text"
         aria-label="Keyword filter"
         placeholder="Filter by keyword..."
         value={keyword}
         onChange={(e) => setFilterState({ keyword: e.target.value })}
-        className="bg-transparent text-text placeholder:text-text-muted text-xs font-mono px-2 py-1 focus:outline-none focus:ring-1 focus:ring-accent"
+        className="min-w-0 flex-1 bg-transparent text-text placeholder:text-text-muted text-xs font-mono px-2 py-1 focus:outline-none focus:ring-1 focus:ring-accent"
       />
       {keyword !== '' && (
         <button

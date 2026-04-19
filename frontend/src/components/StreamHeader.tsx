@@ -76,11 +76,20 @@ export function StreamHeader(): JSX.Element | null {
   return (
     <header className="flex items-baseline gap-6 border-b border-border bg-surface px-6 py-4">
       <div className="min-w-0 flex-1">
-        <h1 className="font-display text-lg text-text line-clamp-1">
+        <div className="flex items-baseline gap-2">
+          <h1 className="font-display text-lg text-text line-clamp-1">
+            {session.broadcasterDisplayName || session.broadcasterLogin}
+          </h1>
+          <span className="font-mono text-xs text-text-muted">
+            @{session.broadcasterLogin}
+          </span>
+        </div>
+        <p className="truncate font-mono text-[11px] text-text-muted">
           {session.streamTitle || '—'}
-        </h1>
-        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-text-muted">
-          {session.gameName || 'uncategorized'}
+          <span className="mx-2 text-text-muted/50">·</span>
+          <span className="uppercase tracking-[0.2em]">
+            {session.gameName || 'uncategorized'}
+          </span>
         </p>
       </div>
       <div className="flex items-center gap-3">

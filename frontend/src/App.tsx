@@ -15,10 +15,7 @@ import { MainPane } from './components/shell/MainPane'
 import { TopNav } from './components/shell/TopNav'
 import { LeftRail } from './components/shell/LeftRail'
 import { ChatDock } from './components/shell/ChatDock'
-import { Tabs } from './components/ui/Tabs'
-import { Badge } from './components/ui/Badge'
 import { ChatPanel } from './features/chat/ChatPanel'
-import { FirstTimerPanel } from './features/firstTimers/FirstTimerPanel'
 import { HeatmapPanel } from './features/heatmap/HeatmapPanel'
 import { MultiStreamLayout } from './features/multiStream/MultiStreamLayout'
 import { PerfOverlay } from './features/perfPanel/PerfOverlay'
@@ -42,7 +39,6 @@ const DemoUnavailableNotice = () => (
 
 const MainPaneContent = () => {
   const session = useChatStore((s) => s.session)
-  const firstTimerCount = useChatStore((s) => s.firstTimers.length)
   const isMultiActive = useMultiStreamStore((s) => s.isActive)
 
   const demoMode = isDemoMode()
@@ -107,29 +103,11 @@ const MainPaneContent = () => {
             </ErrorBoundary>
           </section>
         ) : (
-          <Tabs.Root defaultValue="firstTimers" className="flex-1 min-h-0 flex flex-col">
-            <Tabs.List>
-              <Tabs.Trigger value="firstTimers">
-                First-Timers
-                {firstTimerCount > 0 && (
-                  <Badge variant="accent" className="ml-2">
-                    {firstTimerCount}
-                  </Badge>
-                )}
-              </Tabs.Trigger>
-              <Tabs.Trigger value="heatmap">Heatmap</Tabs.Trigger>
-            </Tabs.List>
-            <Tabs.Content value="firstTimers" className="flex-1 min-h-0">
-              <ErrorBoundary label="First-timers">
-                <FirstTimerPanel />
-              </ErrorBoundary>
-            </Tabs.Content>
-            <Tabs.Content value="heatmap" className="flex-1 min-h-0">
-              <ErrorBoundary label="Heatmap">
-                <HeatmapPanel />
-              </ErrorBoundary>
-            </Tabs.Content>
-          </Tabs.Root>
+          <section className="flex-1 min-h-0 flex flex-col">
+            <ErrorBoundary label="Heatmap">
+              <HeatmapPanel />
+            </ErrorBoundary>
+          </section>
         )}
       </main>
     </>
