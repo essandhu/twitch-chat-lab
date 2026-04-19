@@ -144,10 +144,9 @@ describe('App / LandingView — shell layout with session', () => {
     expect(container.querySelector('[data-shell-section="chat-dock"]')).not.toBeNull()
   })
 
-  it('renders First-Timers + Heatmap tabs inside MainPane when not in multi-stream mode', () => {
+  it('renders the HeatmapPanel inside MainPane when not in multi-stream mode', () => {
     renderLanding()
-    expect(screen.getByRole('tab', { name: /first-timers/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /heatmap/i })).toBeInTheDocument()
+    expect(screen.getByText(/waiting for chat/i)).toBeInTheDocument()
   })
 })
 

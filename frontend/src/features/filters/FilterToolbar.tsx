@@ -15,14 +15,14 @@ interface FilterToggleProps {
 const FilterToggle = ({ label, active, onToggle }: FilterToggleProps) => (
   <Button
     type="button"
-    variant="ghost"
+    variant="secondary"
     size="sm"
     aria-pressed={active}
     data-state={active ? 'active' : 'inactive'}
     onClick={onToggle}
     className={cn(
-      'font-mono uppercase tracking-[0.2em] rounded-sm',
-      active && 'bg-surface-hover text-text',
+      'font-mono uppercase tracking-[0.22em]',
+      active && 'bg-accent text-accent-contrast border-accent hover:bg-accent-hover',
     )}
   >
     {label}
@@ -43,7 +43,7 @@ export const FilterToolbar = () => {
   const activeCount = countActiveFilters(filterState)
 
   return (
-    <div className="relative flex items-center gap-2">
+    <div className="relative flex flex-wrap items-center gap-2">
       {TOGGLES.map(({ flag, label }) => (
         <FilterToggle
           key={flag}
@@ -57,7 +57,7 @@ export const FilterToolbar = () => {
         <Badge
           data-testid="filter-count"
           variant="accent"
-          className="absolute top-1 right-1 font-mono text-[10px] px-1.5 py-0.5"
+          className="font-mono text-[10px] px-1.5 py-0.5"
         >
           {activeCount}
         </Badge>

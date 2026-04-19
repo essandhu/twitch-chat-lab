@@ -5,7 +5,7 @@ import { IconButton } from '../ui/IconButton'
 import { Input } from '../ui/Input'
 import { DropdownMenu } from '../ui/DropdownMenu'
 import { useTheme } from '../../hooks/useTheme'
-import type { ThemeChoice } from '../ThemeProvider'
+import type { ResolvedTheme, ThemeChoice } from '../ThemeProvider'
 import { twitchAuthService } from '../../features/auth/authServices'
 import { isDemoMode } from '../../services/DemoModeService'
 import { PENDING_CHANNEL_KEY } from '../../features/auth/ConnectForm'
@@ -44,11 +44,8 @@ const UserIcon = () => (
   </Svg>
 )
 
-const nextTheme = (current: ThemeChoice): ThemeChoice => {
-  if (current === 'system') return 'dark'
-  if (current === 'dark') return 'light'
-  return 'system'
-}
+const nextTheme = (resolved: ResolvedTheme): ThemeChoice =>
+  resolved === 'dark' ? 'light' : 'dark'
 
 const isFormFieldFocused = (): boolean => {
   const el = document.activeElement
@@ -106,7 +103,7 @@ export const TopNav = ({ leadingRailTrigger }: TopNavProps = {}) => {
     }
   }
 
-  const cycleTheme = () => setTheme(nextTheme(theme))
+  const cycleTheme = () => setTheme(nextTheme(resolvedTheme))
 
   const ThemeIcon = () => {
     if (theme === 'system') return <MonitorIcon />
