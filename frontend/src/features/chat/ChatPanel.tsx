@@ -1,5 +1,6 @@
 import { ChatList } from './ChatList';
 import { FilterToolbar } from '../filters/FilterToolbar';
+import { PinnedMessageRibbon } from './PinnedMessageRibbon';
 
 export function ChatPanel() {
   return (
@@ -7,6 +8,7 @@ export function ChatPanel() {
       <div className="border-b border-ink-800 px-2 py-1">
         <FilterToolbar />
       </div>
+      <PinnedMessageRibbon />
       <div className="flex-1 min-h-0">
         <ChatList />
       </div>

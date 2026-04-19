@@ -19,6 +19,7 @@ function makeMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
     isFirstInSession: false,
     isHighlighted: false,
     timestamp: new Date(0),
+    messageType: 'text',
   }
   return { ...base, ...overrides }
 }

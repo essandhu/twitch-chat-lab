@@ -5,20 +5,33 @@ import { HelixError, type TwitchHelixClient } from './TwitchHelixClient'
 
 // Mock the Zustand store singletons at module boundary so the manager
 // doesn't touch real state when it handles notifications or runs the
-// heatmap tick.
+// heatmap tick. Actions are hoisted so tests can assert routing.
+const { chatActions, heatmapActions } = vi.hoisted(() => ({
+  chatActions: {
+    addMessage: vi.fn(),
+    addSystemEvent: vi.fn(),
+    applyDeletion: vi.fn(),
+    applyUserClear: vi.fn(),
+    applyChatClear: vi.fn(),
+    addPin: vi.fn(),
+    removePin: vi.fn(),
+  },
+  heatmapActions: {
+    incrementCounter: vi.fn(),
+    tick: vi.fn(),
+    addAnnotation: vi.fn(),
+  },
+}))
+
 vi.mock('../store/chatStore', () => ({
   useChatStore: {
-    getState: () => ({ addMessage: vi.fn() }),
+    getState: () => chatActions,
   },
 }))
 
 vi.mock('../store/heatmapStore', () => ({
   useHeatmapStore: {
-    getState: () => ({
-      incrementCounter: vi.fn(),
-      tick: vi.fn(),
-      addAnnotation: vi.fn(),
-    }),
+    getState: () => heatmapActions,
   },
 }))
 
@@ -94,6 +107,8 @@ describe('EventSubManager', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.spyOn(console, 'debug').mockImplementation(() => {})
+    for (const fn of Object.values(chatActions)) fn.mockReset()
+    for (const fn of Object.values(heatmapActions)) fn.mockReset()
   })
 
   afterEach(() => {
@@ -140,12 +155,19 @@ describe('EventSubManager', () => {
     // Allow registerAllSubscriptions to iterate through all 6 specs.
     await flushMicrotasks()
 
-    expect(createEventSubSubscription).toHaveBeenCalledTimes(6)
+    expect(createEventSubSubscription).toHaveBeenCalledTimes(10)
 
     const forbiddenCalls = warnSpy.mock.calls.filter(
       (args) => args[0] === 'eventsub.subscribe.forbidden',
     )
     expect(forbiddenCalls.length).toBeGreaterThanOrEqual(4)
+
+    // Phase 6 subscriptions are appended after the Phase 1 set.
+    const types = createEventSubSubscription.mock.calls.map((c) => (c[0] as { type: string }).type)
+    expect(types).toContain('channel.chat.notification')
+    expect(types).toContain('channel.chat.message_delete')
+    expect(types).toContain('channel.chat.clear_user_messages')
+    expect(types).toContain('channel.chat.clear')
 
     manager.disconnect()
   })
@@ -213,6 +235,204 @@ describe('EventSubManager', () => {
     expect(oldSocketCloseOrder).toHaveLength(1)
     expect(socketConstructionOrder[1]!).toBeLessThan(oldSocketCloseOrder[0]!)
 
+    manager.disconnect()
+  })
+
+  // ---------------------------------------------------------------------------
+  // Phase 6 — routing of new notification types
+  // ---------------------------------------------------------------------------
+
+  const notificationFrame = (subscriptionType: string, event: unknown) => ({
+    metadata: {
+      message_id: `m-${subscriptionType}-${Math.random().toString(36).slice(2)}`,
+      message_type: 'notification',
+      message_timestamp: new Date().toISOString(),
+      subscription_type: subscriptionType,
+      subscription_version: '1',
+    },
+    payload: {
+      subscription: {
+        id: `sub-${subscriptionType}`,
+        type: subscriptionType,
+        version: '1',
+        status: 'enabled',
+        cost: 0,
+        condition: {},
+        transport: { method: 'websocket', session_id: 'sess-1' },
+        created_at: new Date().toISOString(),
+      },
+      event,
+    },
+  })
+
+  const bootManager = async () => {
+    const createEventSubSubscription = vi.fn(async () => {})
+    const mockHelix = { createEventSubSubscription } as unknown as TwitchHelixClient
+    const sockets: FakeSocket[] = []
+    const factory = (url: string): WebSocket => {
+      const s = new FakeSocket(url)
+      sockets.push(s)
+      return s as unknown as WebSocket
+    }
+    const manager = new EventSubManager(mockHelix, factory)
+    const connectPromise = manager.connect({ broadcasterId: 'b1', userId: 'u1', token: 't' })
+    await flushMicrotasks()
+    sockets[0]!.emitMessage(welcomeFrame('sess-1'))
+    await connectPromise
+    await flushMicrotasks()
+    return { manager, socket: sockets[0]! }
+  }
+
+  it('routes channel.chat.notification "raid" notice to chatStore.addSystemEvent', async () => {
+    const { manager, socket } = await bootManager()
+    socket.emitMessage(
+      notificationFrame('channel.chat.notification', {
+        broadcaster_user_id: 'b1',
+        broadcaster_user_login: 'broadcaster',
+        broadcaster_user_name: 'Broadcaster',
+        chatter_user_id: 'u2',
+        chatter_user_login: 'charlie',
+        chatter_user_name: 'Charlie',
+        chatter_is_anonymous: false,
+        color: '#ffffff',
+        badges: [],
+        system_message: '',
+        message_id: 'n1',
+        message: { text: '', fragments: [] },
+        notice_type: 'raid',
+        raid: {
+          user_id: 'u2',
+          user_login: 'charlie',
+          user_name: 'Charlie',
+          viewer_count: 42,
+          profile_image_url: '',
+        },
+      }),
+    )
+    expect(chatActions.addSystemEvent).toHaveBeenCalledTimes(1)
+    const arg = chatActions.addSystemEvent.mock.calls[0]![0] as { noticeType: string }
+    expect(arg.noticeType).toBe('raid')
+    expect(chatActions.addPin).not.toHaveBeenCalled()
+    manager.disconnect()
+  })
+
+  it('routes channel.chat.notification "pin_chat_message" notice to chatStore.addPin', async () => {
+    const { manager, socket } = await bootManager()
+    socket.emitMessage(
+      notificationFrame('channel.chat.notification', {
+        broadcaster_user_id: 'b1',
+        broadcaster_user_login: 'broadcaster',
+        broadcaster_user_name: 'Broadcaster',
+        chatter_user_id: 'mod',
+        chatter_user_login: 'mod',
+        chatter_user_name: 'Mod',
+        chatter_is_anonymous: false,
+        color: '#ffffff',
+        badges: [],
+        system_message: '',
+        message_id: 'p1',
+        message: { text: '', fragments: [] },
+        notice_type: 'pin_chat_message',
+        pin_chat_message: { message: { id: 'm99', text: 'Pinned!' } },
+      }),
+    )
+    expect(chatActions.addPin).toHaveBeenCalledTimes(1)
+    expect(chatActions.addSystemEvent).not.toHaveBeenCalled()
+    manager.disconnect()
+  })
+
+  it('routes channel.chat.notification "unpin_chat_message" notice to chatStore.removePin', async () => {
+    const { manager, socket } = await bootManager()
+    socket.emitMessage(
+      notificationFrame('channel.chat.notification', {
+        broadcaster_user_id: 'b1',
+        broadcaster_user_login: 'broadcaster',
+        broadcaster_user_name: 'Broadcaster',
+        chatter_user_id: 'mod',
+        chatter_user_login: 'mod',
+        chatter_user_name: 'Mod',
+        chatter_is_anonymous: false,
+        color: '#ffffff',
+        badges: [],
+        system_message: '',
+        message_id: 'u1',
+        message: { text: '', fragments: [] },
+        notice_type: 'unpin_chat_message',
+        unpin_chat_message: { message: { id: 'm99' } },
+      }),
+    )
+    expect(chatActions.removePin).toHaveBeenCalledWith('m99')
+    expect(chatActions.addPin).not.toHaveBeenCalled()
+    manager.disconnect()
+  })
+
+  it('routes channel.chat.message_delete to chatStore.applyDeletion(message_id)', async () => {
+    const { manager, socket } = await bootManager()
+    socket.emitMessage(
+      notificationFrame('channel.chat.message_delete', {
+        broadcaster_user_id: 'b1',
+        broadcaster_user_login: 'broadcaster',
+        broadcaster_user_name: 'Broadcaster',
+        target_user_id: 'u5',
+        target_user_login: 'victim',
+        target_user_name: 'Victim',
+        message_id: 'm-deleted',
+      }),
+    )
+    expect(chatActions.applyDeletion).toHaveBeenCalledWith('m-deleted')
+    manager.disconnect()
+  })
+
+  it('routes channel.chat.clear_user_messages to chatStore.applyUserClear(target_user_id)', async () => {
+    const { manager, socket } = await bootManager()
+    socket.emitMessage(
+      notificationFrame('channel.chat.clear_user_messages', {
+        broadcaster_user_id: 'b1',
+        broadcaster_user_login: 'broadcaster',
+        broadcaster_user_name: 'Broadcaster',
+        target_user_id: 'u5',
+        target_user_login: 'spammer',
+        target_user_name: 'Spammer',
+      }),
+    )
+    expect(chatActions.applyUserClear).toHaveBeenCalledWith('u5')
+    manager.disconnect()
+  })
+
+  it('routes channel.chat.clear to chatStore.applyChatClear()', async () => {
+    const { manager, socket } = await bootManager()
+    socket.emitMessage(
+      notificationFrame('channel.chat.clear', {
+        broadcaster_user_id: 'b1',
+        broadcaster_user_login: 'broadcaster',
+        broadcaster_user_name: 'Broadcaster',
+      }),
+    )
+    expect(chatActions.applyChatClear).toHaveBeenCalledTimes(1)
+    manager.disconnect()
+  })
+
+  it('ignores unknown notice_type on channel.chat.notification without crashing or calling any store action', async () => {
+    const { manager, socket } = await bootManager()
+    socket.emitMessage(
+      notificationFrame('channel.chat.notification', {
+        broadcaster_user_id: 'b1',
+        broadcaster_user_login: 'broadcaster',
+        broadcaster_user_name: 'Broadcaster',
+        chatter_user_id: 'u1',
+        chatter_user_login: 'x',
+        chatter_user_name: 'X',
+        chatter_is_anonymous: false,
+        color: '#ffffff',
+        badges: [],
+        system_message: '',
+        message_id: 'n-unknown',
+        message: { text: '', fragments: [] },
+        notice_type: 'brand_new_event_2030',
+      }),
+    )
+    expect(chatActions.addSystemEvent).not.toHaveBeenCalled()
+    expect(chatActions.addPin).not.toHaveBeenCalled()
     manager.disconnect()
   })
 })

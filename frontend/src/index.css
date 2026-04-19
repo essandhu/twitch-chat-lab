@@ -46,4 +46,22 @@
       animation: slideIn 200ms ease-out both;
     }
   }
+
+  @keyframes cheerPillBounce {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .cheer-pill-bounce {
+      animation: cheerPillBounce 180ms ease-out both;
+    }
+  }
 }

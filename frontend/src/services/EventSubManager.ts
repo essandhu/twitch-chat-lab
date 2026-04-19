@@ -1,8 +1,13 @@
 import { logger, setGlobalCorrelationId } from '../lib/logger'
+import { buildPinnedMessage, buildSystemEvent } from '../store/chatMessageMapper'
 import { useChatStore } from '../store/chatStore'
 import { useHeatmapStore } from '../store/heatmapStore'
 import type {
+  ChannelChatClearEvent,
+  ChannelChatClearUserMessagesEvent,
+  ChannelChatMessageDeleteEvent,
   ChannelChatMessageEvent,
+  ChannelChatNotificationEvent,
   EventSubFrame,
   EventSubNotificationPayload,
   EventSubSessionReconnectPayload,
@@ -58,6 +63,26 @@ const buildSubscriptionSpecs = (broadcasterId: string, userId: string): Subscrip
     type: 'channel.hype_train.end',
     version: '2',
     condition: { broadcaster_user_id: broadcasterId },
+  },
+  {
+    type: 'channel.chat.notification',
+    version: '1',
+    condition: { broadcaster_user_id: broadcasterId, user_id: userId },
+  },
+  {
+    type: 'channel.chat.message_delete',
+    version: '1',
+    condition: { broadcaster_user_id: broadcasterId, user_id: userId },
+  },
+  {
+    type: 'channel.chat.clear_user_messages',
+    version: '1',
+    condition: { broadcaster_user_id: broadcasterId, user_id: userId },
+  },
+  {
+    type: 'channel.chat.clear',
+    version: '1',
+    condition: { broadcaster_user_id: broadcasterId, user_id: userId },
   },
 ]
 
@@ -197,6 +222,31 @@ export class EventSubManager {
       return
     }
 
+    if (subscriptionType === 'channel.chat.notification') {
+      this.routeChatNotification(payload.event as ChannelChatNotificationEvent)
+      return
+    }
+
+    if (subscriptionType === 'channel.chat.message_delete') {
+      const event = payload.event as ChannelChatMessageDeleteEvent
+      useChatStore.getState().applyDeletion(event.message_id)
+      return
+    }
+
+    if (subscriptionType === 'channel.chat.clear_user_messages') {
+      const event = payload.event as ChannelChatClearUserMessagesEvent
+      useChatStore.getState().applyUserClear(event.target_user_id)
+      return
+    }
+
+    if (subscriptionType === 'channel.chat.clear') {
+      // Discriminator-only assertion — payload carries no ids we route on.
+      const _event = payload.event as ChannelChatClearEvent
+      void _event
+      useChatStore.getState().applyChatClear()
+      return
+    }
+
     const annotation = subscriptionType ? annotationFromEvent(subscriptionType, payload.event) : null
     if (annotation) {
       useHeatmapStore.getState().addAnnotation({
@@ -205,6 +255,24 @@ export class EventSubManager {
         label: annotation.label,
       })
     }
+  }
+
+  private routeChatNotification(event: ChannelChatNotificationEvent): void {
+    if (event.notice_type === 'unpin_chat_message' && event.unpin_chat_message) {
+      useChatStore.getState().removePin(event.unpin_chat_message.message.id)
+      return
+    }
+    const pin = buildPinnedMessage(event)
+    if (pin) {
+      useChatStore.getState().addPin(pin)
+      return
+    }
+    const sysEvent = buildSystemEvent(event)
+    if (sysEvent) {
+      useChatStore.getState().addSystemEvent(sysEvent)
+      return
+    }
+    logger.debug('eventsub.notification.unknown_notice_type', { noticeType: event.notice_type })
   }
 
   private async registerAllSubscriptions(): Promise<void> {

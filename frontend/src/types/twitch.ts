@@ -181,6 +181,15 @@ export type RawMessageFragment =
   | RawMessageFragmentMention
   | RawMessageFragmentCheermote
 
+export interface RawReplyEnvelope {
+  parent_message_id: string
+  parent_message_body: string
+  parent_user_id: string
+  parent_user_login: string
+  parent_user_name: string
+  thread_parent_message_id: string
+}
+
 export interface ChannelChatMessageEvent {
   broadcaster_user_id: string
   broadcaster_user_login: string
@@ -195,9 +204,9 @@ export interface ChannelChatMessageEvent {
   }
   color: string
   badges: RawBadge[]
-  message_type: 'text' | 'channel_points_highlighted' | 'channel_points_sub_only' | string
+  message_type: 'text' | 'channel_points_highlighted' | 'channel_points_sub_only' | 'user_intro' | string
   cheer?: { bits: number } | null
-  reply?: unknown
+  reply?: RawReplyEnvelope | null
   channel_points_custom_reward_id?: string | null
   source_broadcaster_user_id?: string | null
   source_broadcaster_user_login?: string | null
@@ -265,6 +274,138 @@ export interface ChannelHypeTrainEndEvent {
   cooldown_ends_at: string
 }
 
+// -----------------------------------------------------------------------------
+// channel.chat.notification (v1) — raw shape
+// -----------------------------------------------------------------------------
+
+export interface RawSubPayload {
+  sub_tier: '1000' | '2000' | '3000'
+  is_prime: boolean
+  duration_months: number
+}
+
+export interface RawResubPayload {
+  cumulative_months: number
+  duration_months: number
+  streak_months: number | null
+  sub_tier: '1000' | '2000' | '3000'
+  is_prime: boolean
+  is_gift: boolean
+  gifter_is_anonymous?: boolean
+  gifter_user_id?: string | null
+  gifter_user_login?: string | null
+  gifter_user_name?: string | null
+}
+
+export interface RawSubGiftPayload {
+  duration_months: number
+  cumulative_total: number | null
+  recipient_user_id: string
+  recipient_user_login: string
+  recipient_user_name: string
+  sub_tier: '1000' | '2000' | '3000'
+  community_gift_id: string | null
+}
+
+export interface RawCommunitySubGiftPayload {
+  id: string
+  total: number
+  sub_tier: '1000' | '2000' | '3000'
+  cumulative_total: number | null
+}
+
+export interface RawRaidPayload {
+  user_id: string
+  user_login: string
+  user_name: string
+  viewer_count: number
+  profile_image_url: string
+}
+
+export interface RawAnnouncementPayload {
+  color: 'PRIMARY' | 'BLUE' | 'GREEN' | 'ORANGE' | 'PURPLE'
+}
+
+export interface RawBitsBadgeTierPayload {
+  tier: number
+}
+
+export interface RawCharityDonationPayload {
+  charity_name: string
+  amount: { value: number; decimal_place: number; currency: string }
+}
+
+export interface RawSharedChatJoinPayload {
+  broadcaster_user_id: string
+  broadcaster_user_login: string
+  broadcaster_user_name: string
+}
+
+export interface RawPinChatMessagePayload {
+  message: { id: string; text: string }
+  pinned_at?: string
+}
+
+export interface RawUnpinChatMessagePayload {
+  message: { id: string }
+}
+
+export interface ChannelChatNotificationEvent {
+  broadcaster_user_id: string
+  broadcaster_user_login: string
+  broadcaster_user_name: string
+  chatter_user_id: string | null
+  chatter_user_login: string | null
+  chatter_user_name: string | null
+  chatter_is_anonymous: boolean
+  color: string
+  badges: RawBadge[]
+  system_message: string
+  message_id: string
+  message: { text: string; fragments: RawMessageFragment[] }
+  notice_type: string
+  sub?: RawSubPayload | null
+  resub?: RawResubPayload | null
+  sub_gift?: RawSubGiftPayload | null
+  community_sub_gift?: RawCommunitySubGiftPayload | null
+  raid?: RawRaidPayload | null
+  announcement?: RawAnnouncementPayload | null
+  bits_badge_tier?: RawBitsBadgeTierPayload | null
+  charity_donation?: RawCharityDonationPayload | null
+  shared_chat_join?: RawSharedChatJoinPayload | null
+  pin_chat_message?: RawPinChatMessagePayload | null
+  unpin_chat_message?: RawUnpinChatMessagePayload | null
+}
+
+// -----------------------------------------------------------------------------
+// channel.chat.message_delete / clear_user_messages / clear — raw shapes
+// -----------------------------------------------------------------------------
+
+export interface ChannelChatMessageDeleteEvent {
+  broadcaster_user_id: string
+  broadcaster_user_login: string
+  broadcaster_user_name: string
+  target_user_id: string
+  target_user_name: string
+  target_user_login: string
+  message_id: string
+}
+
+export interface ChannelChatClearUserMessagesEvent {
+  broadcaster_user_id: string
+  broadcaster_user_login: string
+  broadcaster_user_name: string
+  target_user_id: string
+  target_user_name: string
+  target_user_login: string
+}
+
+export interface ChannelChatClearEvent {
+  broadcaster_user_id: string
+  broadcaster_user_login: string
+  broadcaster_user_name: string
+}
+
 // =============================================================================
 // Domain types (camelCase — what the rest of the app consumes)
 // =============================================================================
@@ -281,6 +422,14 @@ export type MessageFragment =
   | { type: 'mention'; text: string; mention: { userId: string; userLogin: string } }
   | { type: 'cheermote'; text: string; cheermote: { prefix: string; bits: number; tier: number } }
 
+export interface ChatMessageReply {
+  parentMessageId: string
+  parentUserLogin: string
+  parentUserName: string
+  parentMessageText: string
+  threadParentMessageId: string | null
+}
+
 export interface ChatMessage {
   id: string
   userId: string
@@ -293,6 +442,9 @@ export interface ChatMessage {
   isFirstInSession: boolean
   isHighlighted: boolean
   timestamp: Date
+  reply?: ChatMessageReply
+  cheer?: { bits: number }
+  messageType: string
 }
 
 export interface StreamSession {
@@ -343,3 +495,75 @@ export interface PerfMetrics {
 
 // Outer key: badge set_id. Inner key: version id. Value: image URL (2x by default).
 export type BadgeMap = Record<string, Record<string, string>>
+
+// -----------------------------------------------------------------------------
+// Phase 6 — domain types for extended chat fidelity
+// -----------------------------------------------------------------------------
+
+export type SubTier = '1000' | '2000' | '3000'
+
+export type AnnouncementColor = 'PRIMARY' | 'BLUE' | 'GREEN' | 'ORANGE' | 'PURPLE'
+
+export type SystemEvent =
+  | {
+      noticeType: 'sub'
+      userName: string
+      tier: SubTier
+      cumulativeMonths: number
+      isGift: boolean
+    }
+  | {
+      noticeType: 'resub'
+      userName: string
+      tier: SubTier
+      cumulativeMonths: number
+      streakMonths: number | null
+      durationMonths: number
+    }
+  | {
+      noticeType: 'gift-sub'
+      fromUserName: string
+      total: number
+      tier: SubTier
+      isAnonymous: boolean
+    }
+  | {
+      noticeType: 'raid'
+      fromUserName: string
+      viewers: number
+    }
+  | {
+      noticeType: 'announcement'
+      userName: string
+      body: string
+      color: AnnouncementColor
+    }
+  | {
+      noticeType: 'bits-badge-tier'
+      userName: string
+      tier: number
+    }
+  | {
+      noticeType: 'charity-donation'
+      userName: string
+      amount: { value: number; currency: string }
+    }
+  | {
+      noticeType: 'shared-chat-joined'
+      broadcasterUserName: string
+    }
+
+export interface PinnedMessage {
+  id: string
+  messageId: string
+  userLogin: string
+  userName: string
+  text: string
+  pinnedAt: Date
+}
+
+export type ChatRow =
+  | { kind: 'message'; id: string; message: ChatMessage }
+  | { kind: 'system'; id: string; event: SystemEvent; timestamp: Date }
+  | { kind: 'deletion'; id: string; messageId: string; deletedAt: Date }
+  | { kind: 'chat-cleared'; id: string; clearedAt: Date }
