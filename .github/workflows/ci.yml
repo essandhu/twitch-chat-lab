@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Manual re-run escape hatch — useful when a bot-authored push (e.g. the
+  # Update Visual Baselines workflow) lands commits on a branch, since
+  # GITHUB_TOKEN-authored pushes do not trigger downstream workflows.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}

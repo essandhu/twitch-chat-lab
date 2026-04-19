@@ -25,11 +25,11 @@ export const useResponsiveLayout = (): ResponsiveFlags => {
   const isBelow1280 = useIsBelow(1280)
   const isBelow1440 = useIsBelow(1440)
 
-  // Width spec: ≥ 1440 → 340, 1280–1439 → 320, < 1280 → 300. Mobile renders
+  // Width spec: ≥ 1440 → 400, 1280–1439 → 380, < 1280 → 360. Mobile renders
   // in a sheet so the fallback is mostly cosmetic there.
-  let dockDefaultWidth = 340
-  if (isBelow1440) dockDefaultWidth = 320
-  if (isBelow1280) dockDefaultWidth = 300
+  let dockDefaultWidth = 400
+  if (isBelow1440) dockDefaultWidth = 380
+  if (isBelow1280) dockDefaultWidth = 360
 
   return { isMobile, dockDefaultWidth }
 }

@@ -23,17 +23,26 @@ test.describe('Phase 7 — persistence', () => {
       .toBe('light')
     expect(await page.evaluate(() => localStorage.getItem('tcl.theme'))).toBe('light')
 
-    // Toggle via the theme-toggle IconButton. Cycle is system → dark → light → system,
-    // so from 'light' the next value is 'system'.
+    // Toggle via the theme-toggle IconButton. Cycle flips between dark/light
+    // based on resolvedTheme (system is the initial default but not in the
+    // click cycle), so from 'light' the next value is 'dark'.
     const themeBtn = page.getByRole('button', { name: /Theme:/i })
     await themeBtn.click()
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem('tcl.theme')))
-      .toBe('system')
+      .toBe('dark')
 
     await page.reload()
-    // After reload with 'system' in storage, inline script resolves via OS
-    // preference — still a valid 'dark' or 'light' value on the <html> element.
+    // data-theme is written by the inline script in index.html before React
+    // hydrates — reload preserves the explicit 'dark' choice (no-flash).
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme')))
+      .toBe('dark')
+
+    // Explicit 'system' is still a valid stored value on first load — verify
+    // it resolves via OS preference on reload without flashing.
+    await page.evaluate(() => localStorage.setItem('tcl.theme', 'system'))
+    await page.reload()
     await expect
       .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme')))
       .toMatch(/^(dark|light)$/)
