@@ -145,7 +145,7 @@ export const ChatDock = ({ children, className, defaultWidth = DEFAULT_WIDTH }: 
           type="button"
           aria-label="Expand chat"
           onClick={toggleCollapsed}
-          className="text-text-muted hover:text-text px-1 py-2 text-sm"
+          className="text-text-muted hover:text-text px-1 py-2 text-sm rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           style={{ writingMode: 'vertical-rl' }}
         >
           Chat

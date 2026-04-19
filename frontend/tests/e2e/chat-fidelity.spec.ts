@@ -5,8 +5,9 @@ test.describe('Phase 6 — extended chat fidelity', () => {
     const h = await openDemo(page, eventSub)
     h.pushChatMessage({ username: 'alice', userId: 'uid_alice', text: 'hello phase 6' })
 
-    await expect(page.getByTestId('chat-row').first()).toBeVisible()
-    await expect(page.getByText('hello phase 6')).toBeVisible()
+    const chatList = page.getByTestId('chat-list')
+    await expect(chatList.getByTestId('chat-row').first()).toBeVisible()
+    await expect(chatList.getByText('hello phase 6')).toBeVisible()
   })
 
   test('reply message shows a "Replying to @parent" header pointing at the parent', async ({
@@ -137,9 +138,10 @@ test.describe('Phase 6 — extended chat fidelity', () => {
     eventSub,
   }) => {
     const h = await openDemo(page, eventSub)
+    const chatList = page.getByTestId('chat-list')
     // Push a chat message, capture the message_id from the store, then delete it.
     h.pushChatMessage({ username: 'victim', userId: 'uid_victim', text: 'this will be deleted' })
-    await expect(page.getByText('this will be deleted')).toBeVisible()
+    await expect(chatList.getByText('this will be deleted')).toBeVisible()
 
     const targetMessageId = await page.evaluate(() => {
       // Walk the zustand store via the dev escape hatch — during dev the store
@@ -159,13 +161,13 @@ test.describe('Phase 6 — extended chat fidelity', () => {
 
     if (targetMessageId) {
       h.pushMessageDelete({ messageId: targetMessageId, targetUserLogin: 'victim' })
-      await expect(page.getByText(/message removed by moderator/i)).toBeVisible()
-      await expect(page.getByText('this will be deleted')).toBeHidden()
+      await expect(chatList.getByText(/message removed by moderator/i)).toBeVisible()
+      await expect(chatList.getByText('this will be deleted')).toBeHidden()
     } else {
       // Fallback path — store escape hatch not wired. Still verify the
       // delete event doesn't crash the app when message_id doesn't match.
       h.pushMessageDelete({ messageId: 'nonexistent', targetUserLogin: 'victim' })
-      await expect(page.getByText('this will be deleted')).toBeVisible()
+      await expect(chatList.getByText('this will be deleted')).toBeVisible()
     }
   })
 
@@ -174,19 +176,20 @@ test.describe('Phase 6 — extended chat fidelity', () => {
     eventSub,
   }) => {
     const h = await openDemo(page, eventSub)
+    const chatList = page.getByTestId('chat-list')
     h.pushChatMessage({ username: 'spammer', userId: 'uid_spammer', text: 'spam line 1' })
     h.pushChatMessage({ username: 'spammer', userId: 'uid_spammer', text: 'spam line 2' })
-    await expect(page.getByText('spam line 2')).toBeVisible()
+    await expect(chatList.getByText('spam line 2')).toBeVisible()
 
     h.pushUserClear({ targetUserId: 'uid_spammer', targetUserLogin: 'spammer' })
-    await expect(page.getByText('spam line 1')).toBeHidden()
-    await expect(page.getByText('spam line 2')).toBeHidden()
-    await expect(page.getByText(/message removed by moderator/i).first()).toBeVisible()
+    await expect(chatList.getByText('spam line 1')).toBeHidden()
+    await expect(chatList.getByText('spam line 2')).toBeHidden()
+    await expect(chatList.getByText(/message removed by moderator/i).first()).toBeVisible()
 
     h.pushChatMessage({ username: 'spammer', userId: 'uid_spammer', text: 'now-visible line' })
     // A fresh message from the same user lands in the buffer AFTER the clear,
     // so it renders normally — the clear only redacts prior messages.
-    await expect(page.getByText('now-visible line')).toBeVisible()
+    await expect(chatList.getByText('now-visible line')).toBeVisible()
   })
 
   test('chat-clear — wipes the buffer and inserts a "Chat cleared" marker', async ({
@@ -194,12 +197,13 @@ test.describe('Phase 6 — extended chat fidelity', () => {
     eventSub,
   }) => {
     const h = await openDemo(page, eventSub)
+    const chatList = page.getByTestId('chat-list')
     h.pushChatMessage({ username: 'alice', userId: 'uid_alice', text: 'before clear' })
-    await expect(page.getByText('before clear')).toBeVisible()
+    await expect(chatList.getByText('before clear')).toBeVisible()
 
     h.pushChatClear()
-    await expect(page.getByText('before clear')).toBeHidden()
-    await expect(page.getByText(/chat cleared by a moderator/i)).toBeVisible()
+    await expect(chatList.getByText('before clear')).toBeHidden()
+    await expect(chatList.getByText(/chat cleared by a moderator/i)).toBeVisible()
     const clearedRows = page.locator('[data-row-kind="chat-cleared"]')
     await expect(clearedRows).toHaveCount(1)
   })

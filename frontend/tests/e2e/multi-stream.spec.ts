@@ -38,10 +38,13 @@ test('multi-stream: add 2 channels, see 3 columns, upstream_lost degrades one, e
   await expect(page.getByRole('button', { name: /exit multi-stream mode/i })).toBeVisible()
 
   // Three columns: demouser + alt_one + alt_two (per DEFAULT_HELIX.alternateStreams[0..1]).
-  // Column headers display the broadcaster display name.
-  await expect(page.getByText(/demouser/i).first()).toBeVisible()
-  await expect(page.getByText(/altone/i)).toBeVisible()
-  await expect(page.getByText(/alttwo/i)).toBeVisible()
+  // Column headers display the broadcaster display name. Scope to <main> so
+  // the LeftRail's tracked-streams list (which also renders display names)
+  // doesn't trigger strict-mode dupes.
+  const main = page.getByRole('main')
+  await expect(main.getByText(/demouser/i).first()).toBeVisible()
+  await expect(main.getByText(/altone/i)).toBeVisible()
+  await expect(main.getByText(/alttwo/i)).toBeVisible()
 
   // Fan enveloped chat into each column.
   proxyHandle.pushChat('demouser', 'hello from demouser', 'userA')
