@@ -5,6 +5,9 @@ import { useChatStore } from '../../store/chatStore'
 import { eventSubManager, twitchAuthService, twitchHelixClient } from './authServices'
 import { PENDING_CHANNEL_KEY } from './ConnectForm'
 import { buildSession, mergeBadges } from './sessionBootstrap'
+import { Card } from '../../components/ui/Card'
+import { Button } from '../../components/ui/Button'
+import { Skeleton } from '../../components/ui/Skeleton'
 
 type CallbackStatus =
   | { kind: 'pending' }
@@ -88,31 +91,38 @@ export const AuthCallback = () => {
 
   if (status.kind === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-ink-950 text-ink-100">
-        <div className="grain relative flex flex-col gap-4 border border-ember-500/40 bg-ink-900/70 p-8 max-w-md">
-          <div className="font-mono text-[11px] uppercase tracking-[0.3em] text-ember-500">
-            Authentication Failed
-          </div>
-          <p className="text-ink-300">{status.message}</p>
-          <button
-            type="button"
-            onClick={() => navigate('/', { replace: true })}
-            className="self-start border border-ember-500 px-4 py-2 font-mono text-xs uppercase tracking-[0.3em] text-ember-500 hover:bg-ember-500 hover:text-ink-950"
-          >
-            Try again
-          </button>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-bg text-text p-6">
+        <Card className="max-w-md w-full">
+          <Card.Body className="flex flex-col gap-4 p-8">
+            <div className="text-xs font-semibold uppercase tracking-wider text-danger">
+              Authentication Failed
+            </div>
+            <p className="text-sm text-text-muted">{status.message}</p>
+            <Button
+              variant="secondary"
+              className="self-start"
+              onClick={() => navigate('/', { replace: true })}
+            >
+              Try again
+            </Button>
+          </Card.Body>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-ink-950 text-ink-100">
-      <div className="flex flex-col items-center gap-3 font-mono text-xs uppercase tracking-[0.3em] text-ember-500">
-        <div className="h-px w-24 animate-pulse bg-ember-500" />
-        <span>Handshaking with Twitch</span>
-        <div className="h-px w-12 animate-pulse bg-ember-500/60" />
-      </div>
+    <div className="flex min-h-screen items-center justify-center bg-bg text-text p-6">
+      <Card className="max-w-md w-full">
+        <Card.Body className="flex flex-col gap-4 p-8">
+          <div className="text-xs font-semibold uppercase tracking-wider text-accent">
+            Handshaking with Twitch
+          </div>
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+          <Skeleton className="h-4 w-2/3" />
+        </Card.Body>
+      </Card>
     </div>
   )
 }

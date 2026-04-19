@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { ChatList } from '../chat/ChatList'
 import { useMultiStreamStore, useStreamSlice } from '../../store/multiStreamStore'
+import { Card } from '../../components/ui/Card'
+import { IconButton } from '../../components/ui/IconButton'
+import { Avatar } from '../../components/ui/Avatar'
 
 interface MultiStreamChatColumnProps {
   streamLogin: string
@@ -24,49 +27,57 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
   }
 
   const showBanner = slice.isDegraded && !bannerDismissed
+  // StreamSlice currently carries no thumbnail URL from Helix — fall back to
+  // the displayName initial (no Helix fetch added per P7-16 scope).
+  const initial = slice.displayName.charAt(0).toUpperCase()
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col border border-ink-800 bg-ink-900/40">
-      <div className="border-b border-ink-800 bg-ink-900/40 px-4 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-2 font-mono text-xs text-ink-200">
+    <Card className="relative flex h-full min-h-0 flex-col rounded-none">
+      <Card.Header className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <Avatar.Root className="h-6 w-6 flex-shrink-0">
+            <Avatar.Fallback>{initial}</Avatar.Fallback>
+          </Avatar.Root>
           <span
             aria-hidden="true"
-            className={`inline-block h-2 w-2 rounded-full ${
-              slice.isDegraded ? 'bg-ink-600' : 'bg-ember-500'
+            className={`inline-block h-2 w-2 rounded-full flex-shrink-0 ${
+              slice.isDegraded ? 'bg-surface-hover' : 'bg-success'
             }`}
           />
-          <span className="font-display text-sm text-ink-100">{slice.displayName}</span>
+          <span className="font-semibold text-sm text-text truncate">
+            {slice.displayName}
+          </span>
         </div>
-        <button
-          type="button"
-          onClick={handleClose}
+        <IconButton
+          size="sm"
+          tooltip="Remove stream"
           aria-label={`Close ${slice.displayName} stream`}
-          className="text-ink-500 hover:text-ink-100 font-mono text-sm px-1"
+          onClick={handleClose}
         >
           ×
-        </button>
-      </div>
+        </IconButton>
+      </Card.Header>
 
       {showBanner && (
         <div
           role="alert"
-          className="flex items-center justify-between gap-2 border-b border-ember-500/60 bg-ember-500/10 px-3 py-1.5 font-mono text-[11px] text-ember-400"
+          className="flex items-center justify-between gap-2 border-b border-warning/60 bg-warning/10 px-3 py-1.5 text-xs text-warning"
         >
           <span>Connection lost — close and re-add to retry</span>
-          <button
-            type="button"
-            onClick={() => setBannerDismissed(true)}
+          <IconButton
+            size="sm"
             aria-label="Dismiss connection lost banner"
-            className="text-ember-400 hover:text-ember-300 px-1"
+            onClick={() => setBannerDismissed(true)}
+            className="text-warning hover:text-warning"
           >
             ×
-          </button>
+          </IconButton>
         </div>
       )}
 
       <div className="flex-1 min-h-0">
         <ChatList messagesOverride={slice.messages} />
       </div>
-    </div>
+    </Card>
   )
 }

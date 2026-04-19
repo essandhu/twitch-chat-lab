@@ -1,5 +1,8 @@
 import { useChatStore } from '../../store/chatStore'
 import type { FilterState } from '../../types/twitch'
+import { Badge } from '../../components/ui/Badge'
+import { Button } from '../../components/ui/Button'
+import { cn } from '../../lib/cn'
 import { KeywordFilter } from './KeywordFilter'
 import { countActiveFilters } from './filterLogic'
 
@@ -10,16 +13,20 @@ interface FilterToggleProps {
 }
 
 const FilterToggle = ({ label, active, onToggle }: FilterToggleProps) => (
-  <button
+  <Button
     type="button"
+    variant="ghost"
+    size="sm"
     aria-pressed={active}
+    data-state={active ? 'active' : 'inactive'}
     onClick={onToggle}
-    className={`text-xs font-mono uppercase tracking-[0.2em] px-3 py-1.5 rounded-sm transition ${
-      active ? 'bg-ember-500 text-ink-950' : 'bg-ink-800 text-ink-300 hover:bg-ink-700'
-    }`}
+    className={cn(
+      'font-mono uppercase tracking-[0.2em] rounded-sm',
+      active && 'bg-surface-hover text-text',
+    )}
   >
     {label}
-  </button>
+  </Button>
 )
 
 type ToggleFlag = 'firstTimeOnly' | 'subscribersOnly' | 'hypeModeOnly'
@@ -47,12 +54,13 @@ export const FilterToolbar = () => {
       ))}
       <KeywordFilter />
       {activeCount > 0 && (
-        <span
+        <Badge
           data-testid="filter-count"
-          className="absolute top-1 right-1 rounded-full bg-ember-500 text-ink-950 text-[10px] font-mono px-1.5 py-0.5"
+          variant="accent"
+          className="absolute top-1 right-1 font-mono text-[10px] px-1.5 py-0.5"
         >
           {activeCount}
-        </span>
+        </Badge>
       )}
     </div>
   )

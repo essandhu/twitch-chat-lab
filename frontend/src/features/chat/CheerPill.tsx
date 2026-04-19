@@ -1,5 +1,8 @@
 import { memo, useMemo } from 'react'
 
+// Twitch-canonical cheer tier colors — NOT semantic tokens; these stay as
+// Twitch's fixed bit-tier hues (gray / purple / green / blue / red) per the
+// Bits spec and must not be mapped to the design-system palette.
 export const cheerTierColor = (bits: number): string => {
   if (bits >= 10000) return '#EF4444'
   if (bits >= 5000) return '#3B82F6'

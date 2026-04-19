@@ -16,13 +16,13 @@ function PinChip({ pin }: PinChipProps) {
   return (
     <div
       data-testid="pinned-chip"
-      className="flex items-center gap-2 px-2 py-1 bg-ink-800/70 border-l-2 border-ember-400 rounded-sm max-w-xs min-w-0"
+      className="flex items-center gap-2 px-2 py-1 bg-surface-raised/40 border-l-2 border-accent rounded-sm max-w-xs min-w-0"
     >
-      <span aria-hidden="true" className="text-ember-400">
+      <span aria-hidden="true" className="text-accent">
         📌
       </span>
-      <span className="text-xs font-semibold text-ink-100 whitespace-nowrap">{pin.userName}</span>
-      <span className="text-xs text-ink-300 truncate">{truncate(pin.text)}</span>
+      <span className="text-xs font-semibold text-text whitespace-nowrap">{pin.userName}</span>
+      <span className="text-xs text-text-muted truncate">{truncate(pin.text)}</span>
     </div>
   )
 }
@@ -39,7 +39,7 @@ export function PinnedMessageRibbon(): JSX.Element | null {
   return (
     <div
       data-testid="pinned-ribbon"
-      className="relative sticky top-0 z-10 border-b border-ink-800 bg-ink-900/90 backdrop-blur"
+      className="relative sticky top-0 z-10 border-b border-border bg-surface/70 backdrop-blur"
     >
       <div className="flex items-center gap-2 px-2 py-1 overflow-x-auto">
         {visible.map((pin) => (
@@ -49,7 +49,7 @@ export function PinnedMessageRibbon(): JSX.Element | null {
           <button
             type="button"
             onClick={() => setExpanded((e) => !e)}
-            className="px-2 py-1 text-xs text-ember-400 hover:text-ember-500 whitespace-nowrap"
+            className="px-2 py-1 text-xs text-accent hover:text-accent-hover whitespace-nowrap"
           >
             +{overflow.length} more
           </button>

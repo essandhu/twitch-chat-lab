@@ -13,16 +13,16 @@ interface ChatMessageProps {
 const BASE_CLASS = 'flex items-baseline gap-1 px-3 py-0.5 text-sm leading-tight'
 
 const variantClass = (messageType: string, isHighlighted: boolean): string => {
-  if (isHighlighted) return 'bg-ink-700/40'
-  if (messageType === 'channel_points_highlighted') return 'bg-ink-700/40'
-  if (messageType === 'channel_points_sub_only') return 'border-l-2 border-ember-400/50'
-  if (messageType === 'user_intro') return 'bg-ember-500/5'
+  if (isHighlighted) return 'bg-surface-hover/40'
+  if (messageType === 'channel_points_highlighted') return 'bg-surface-hover/40'
+  if (messageType === 'channel_points_sub_only') return 'border-l-2 border-accent/50'
+  if (messageType === 'user_intro') return 'bg-accent/5'
   return ''
 }
 
 function IntroBadge() {
   return (
-    <span className="px-1 py-0.5 text-[10px] font-semibold rounded bg-ember-500/20 text-ember-400">
+    <span className="px-1 py-0.5 text-[10px] font-semibold rounded bg-accent/20 text-accent">
       👋 intro
     </span>
   )
@@ -33,7 +33,7 @@ function ChatMessageInner({ message }: ChatMessageProps): JSX.Element {
 
   const className = [
     BASE_CLASS,
-    message.isFirstInSession ? 'bg-ember-500/10 border-l-2 border-ember-400' : '',
+    message.isFirstInSession ? 'bg-accent/10 border-l-2 border-accent' : '',
     variantClass(message.messageType, message.isHighlighted),
   ]
     .filter(Boolean)
@@ -50,7 +50,7 @@ function ChatMessageInner({ message }: ChatMessageProps): JSX.Element {
       <span className="font-semibold" style={{ color: message.color || '#a1a1aa' }}>
         {message.displayName}
       </span>
-      <span className="text-ink-500 mr-1">:</span>
+      <span className="text-text-muted mr-1">:</span>
       {message.cheer ? <CheerPill bits={message.cheer.bits} /> : null}
       <EmoteText fragments={message.fragments} cheerTierColor={cheerColor} />
     </>

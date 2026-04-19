@@ -22,11 +22,11 @@ describe('PerfOverlay', () => {
     expect(screen.queryByRole('complementary')).toBeNull()
   })
 
-  it('renders aside with aria-label when visible', () => {
+  it('renders complementary landmark with aria-label when visible', () => {
     usePerfStore.setState({ isVisible: true })
     render(<PerfOverlay />)
-    const aside = screen.getByRole('complementary', { name: 'Performance metrics' })
-    expect(aside).toBeInTheDocument()
+    const region = screen.getByRole('complementary', { name: 'Performance metrics' })
+    expect(region).toBeInTheDocument()
   })
 
   it('heap row shows "n/a" with hint when jsHeapUsedMB is null', () => {
@@ -36,7 +36,7 @@ describe('PerfOverlay', () => {
     expect(screen.getByTitle(HEAP_HINT)).toBeInTheDocument()
   })
 
-  it('heap value is degraded (text-ember-400) when jsHeapUsedMB > 200', () => {
+  it('heap value is degraded (text-warning) when jsHeapUsedMB > 200', () => {
     usePerfStore.setState({
       isVisible: true,
       metrics: {
@@ -49,10 +49,10 @@ describe('PerfOverlay', () => {
     })
     render(<PerfOverlay />)
     const heapValue = screen.getByText('250.0 MB')
-    expect(heapValue.className).toContain('text-ember-400')
+    expect(heapValue.className).toContain('text-warning')
   })
 
-  it('virtualizer value is degraded (text-ember-400) when virtualizerRenderMs > 16', () => {
+  it('virtualizer value is degraded (text-warning) when virtualizerRenderMs > 16', () => {
     usePerfStore.setState({
       isVisible: true,
       metrics: {
@@ -65,7 +65,7 @@ describe('PerfOverlay', () => {
     })
     render(<PerfOverlay />)
     const virtValue = screen.getByText('20.0 ms')
-    expect(virtValue.className).toContain('text-ember-400')
+    expect(virtValue.className).toContain('text-warning')
   })
 
   it('latency NOT degraded at 400ms (threshold is > 500)', () => {
@@ -81,15 +81,18 @@ describe('PerfOverlay', () => {
     })
     render(<PerfOverlay />)
     const latencyValue = screen.getByText('400 ms')
-    expect(latencyValue.className).toContain('text-ink-100')
-    expect(latencyValue.className).not.toContain('text-ember-400')
+    expect(latencyValue.className).toContain('text-text')
+    expect(latencyValue.className).not.toContain('text-warning')
   })
 
   it('renders five MetricRows when visible', () => {
     usePerfStore.setState({ isVisible: true })
-    const { container } = render(<PerfOverlay />)
-    const rows = container.querySelectorAll('aside > div:nth-child(2) > div')
-    expect(rows.length).toBe(5)
+    render(<PerfOverlay />)
+    const region = screen.getByRole('complementary', { name: 'Performance metrics' })
+    // The first child is the "perf · live" header; the second child is the
+    // MetricRow container.
+    const metricContainer = region.children[1] as HTMLElement
+    expect(metricContainer.children.length).toBe(5)
   })
 
   it('formats metrics per row spec (locale + toFixed)', () => {

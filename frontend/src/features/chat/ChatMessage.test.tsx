@@ -75,7 +75,7 @@ describe('ChatMessage', () => {
     )
     const row = container.firstChild as HTMLElement
     expect(row.className).toMatch(/border-l-2/)
-    expect(row.className).toMatch(/ember/)
+    expect(row.className).toMatch(/accent/)
   })
 
   it('applies user_intro variant class and renders the intro badge', () => {
@@ -83,7 +83,7 @@ describe('ChatMessage', () => {
       <ChatMessage message={base({ messageType: 'user_intro' })} />,
     )
     const row = container.firstChild as HTMLElement
-    expect(row.className).toMatch(/ember-500\/5/)
+    expect(row.className).toMatch(/accent\/5/)
     expect(screen.getByText(/intro/i)).toBeInTheDocument()
   })
 
@@ -94,6 +94,6 @@ describe('ChatMessage', () => {
       />,
     )
     const row = container.firstChild as HTMLElement
-    expect(row.className).toMatch(/ink-700/)
+    expect(row.className).toMatch(/surface-hover/)
   })
 })

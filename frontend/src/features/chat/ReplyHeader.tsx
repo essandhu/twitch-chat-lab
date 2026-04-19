@@ -19,7 +19,7 @@ function ReplyHeaderInner({ reply, onScrollToParent }: ReplyHeaderProps) {
 
   if (!parent) {
     return (
-      <span className="block px-3 pt-1 text-xs italic text-ink-500">{UNAVAILABLE_LABEL}</span>
+      <span className="block px-3 pt-1 text-xs italic text-text-muted">{UNAVAILABLE_LABEL}</span>
     )
   }
 
@@ -28,10 +28,10 @@ function ReplyHeaderInner({ reply, onScrollToParent }: ReplyHeaderProps) {
     <button
       type="button"
       onClick={() => onScrollToParent?.(reply.parentMessageId)}
-      className="block w-full text-left px-3 pt-1 text-xs text-ink-300 hover:text-ink-100 focus:outline-none focus:text-ink-100 truncate"
+      className="block w-full text-left px-3 pt-1 text-xs text-text-muted hover:text-accent focus:outline-none focus:text-accent truncate"
     >
       Replying to <span className="font-semibold">@{reply.parentUserName}</span>
-      <span className="text-ink-500">: {preview}</span>
+      <span className="text-text-muted">: {preview}</span>
     </button>
   )
 }

@@ -9,7 +9,7 @@ function DeletionMarkerInner({ reason: _reason = 'deleted' }: DeletionMarkerProp
     <div
       role="status"
       data-row-role="deletion-marker"
-      className="px-3 py-0.5 text-xs italic text-ink-500 leading-tight"
+      className="px-3 py-0.5 text-xs italic text-text-muted leading-tight"
     >
       Message removed by moderator
     </div>

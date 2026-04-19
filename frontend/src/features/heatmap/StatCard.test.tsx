@@ -18,25 +18,25 @@ describe('StatCard', () => {
     expect(screen.getByText('1,234')).toBeInTheDocument()
   })
 
-  it('default accent: value has text-ink-100 and NOT text-ember-400', () => {
+  it('default accent: value has text-text and NOT text-accent', () => {
     render(<StatCard label="Now" value="99" />)
     const valueEl = screen.getByText('99')
-    expect(valueEl.className).toContain('text-ink-100')
-    expect(valueEl.className).not.toContain('text-ember-400')
+    expect(valueEl.className).toContain('text-text')
+    expect(valueEl.className).not.toContain('text-accent')
   })
 
-  it('peak accent: value has text-ember-400', () => {
+  it('peak accent: value has text-accent', () => {
     render(<StatCard label="Peak" value="500" accent="peak" />)
     const valueEl = screen.getByText('500')
-    expect(valueEl.className).toContain('text-ember-400')
+    expect(valueEl.className).toContain('text-accent')
   })
 
-  it('surface wrapper has border, border-ink-800 and bg-ink-900/40 classes', () => {
+  it('surface wrapper has border, border-border and bg-surface classes', () => {
     const { container } = render(<StatCard label="Now" value="1" />)
     const surface = container.firstChild as HTMLElement
     expect(surface.className).toContain('border')
-    expect(surface.className).toContain('border-ink-800')
-    expect(surface.className).toContain('bg-ink-900/40')
+    expect(surface.className).toContain('border-border')
+    expect(surface.className).toContain('bg-surface')
   })
 
   it('is wrapped in React.memo (structural check)', () => {

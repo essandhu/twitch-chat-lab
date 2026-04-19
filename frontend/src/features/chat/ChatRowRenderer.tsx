@@ -13,7 +13,7 @@ function ChatRowRendererInner({ row }: ChatRowRendererProps): JSX.Element {
   if (row.kind === 'system') return <SystemEventRow event={row.event} />
   if (row.kind === 'deletion') return <DeletionMarker />
   return (
-    <div className="px-3 py-0.5 text-xs italic text-ink-500 leading-tight">
+    <div className="px-3 py-0.5 text-xs italic text-text-muted leading-tight">
       Chat cleared by a moderator
     </div>
   )

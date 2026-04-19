@@ -8,9 +8,15 @@ import { ConnectForm } from './features/auth/ConnectForm'
 import { twitchAuthService } from './features/auth/authServices'
 import { startDemoSession } from './features/auth/demoSession'
 import { StreamHeader } from './components/StreamHeader'
-import { TabBar } from './components/TabBar'
 import { DemoBanner } from './components/DemoBanner'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { AppShell } from './components/shell/AppShell'
+import { MainPane } from './components/shell/MainPane'
+import { TopNav } from './components/shell/TopNav'
+import { LeftRail } from './components/shell/LeftRail'
+import { ChatDock } from './components/shell/ChatDock'
+import { Tabs } from './components/ui/Tabs'
+import { Badge } from './components/ui/Badge'
 import { ChatPanel } from './features/chat/ChatPanel'
 import { FirstTimerPanel } from './features/firstTimers/FirstTimerPanel'
 import { HeatmapPanel } from './features/heatmap/HeatmapPanel'
@@ -20,7 +26,7 @@ import { getDemoConfig, isDemoMode } from './services/DemoModeService'
 import { logger } from './lib/logger'
 
 const DemoMisconfigNotice = () => (
-  <div className="mb-8 max-w-md border border-ember-500/40 bg-ink-900/70 p-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ember-500">
+  <div className="mb-8 max-w-md border border-warning/40 bg-surface-raised p-4 font-mono text-[11px] uppercase tracking-[0.22em] text-warning">
     Demo mode not configured — set VITE_DEMO_* in env.
   </div>
 )
@@ -28,39 +34,21 @@ const DemoMisconfigNotice = () => (
 const DemoUnavailableNotice = () => (
   <div
     role="alert"
-    className="mb-8 max-w-md border border-ember-500/40 bg-ink-900/70 p-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ember-500"
+    className="mb-8 max-w-md border border-warning/40 bg-surface-raised p-4 font-mono text-[11px] uppercase tracking-[0.22em] text-warning"
   >
     Demo unavailable — couldn't find a live channel. Try again in a moment.
   </div>
 )
 
-export const LandingView = () => {
+const MainPaneContent = () => {
   const session = useChatStore((s) => s.session)
   const firstTimerCount = useChatStore((s) => s.firstTimers.length)
   const isMultiActive = useMultiStreamStore((s) => s.isActive)
-  const [activeTabId, setActiveTabId] = useState<'chat' | 'firstTimers'>('chat')
 
   const demoMode = isDemoMode()
-  // Stable config reference per mount — DemoModeService is pure so re-reads are cheap
-  // but we avoid re-running the effect on every render.
   const demoConfig = useMemo(() => (demoMode ? getDemoConfig() : null), [demoMode])
   const [demoFailed, setDemoFailed] = useState(false)
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const isP = e.key === 'P' || e.key === 'p'
-      if (!isP || !e.ctrlKey || !e.shiftKey || e.altKey || e.metaKey) return
-      e.preventDefault()
-      usePerfStore.getState().toggleVisibility()
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
-
-  // StrictMode double-invokes effects in dev; startDemoSession is not
-  // idempotent (resetForNewChannel wipes chatStore), so guard with a ref so
-  // the second invocation no-ops. The query-param-derived demoConfig doesn't
-  // change during a session, so this is effectively a once-per-session gate.
   const demoStartedRef = useRef(false)
   useEffect(() => {
     if (!demoConfig) return
@@ -78,86 +66,124 @@ export const LandingView = () => {
     }
   }, [demoConfig])
 
+  const demoConnecting = demoMode && demoConfig !== null && !demoFailed
+
   if (!session) {
-    const demoConnecting = demoMode && demoConfig !== null && !demoFailed
     return (
-      <div className="relative flex min-h-screen flex-col">
+      <>
         {demoConnecting && (
           <DemoBanner onSignIn={() => twitchAuthService.authorize()} />
         )}
-        <div className="relative flex flex-1 items-center justify-center px-6 py-12">
-          <div className="absolute top-10 left-10 font-mono text-[10px] uppercase tracking-[0.4em] text-ink-500">
-            twitch · chat · lab
-          </div>
-          <div className="absolute bottom-10 right-10 font-mono text-[10px] uppercase tracking-[0.4em] text-ink-500">
-            phase 01 · foundation
-          </div>
+        <div className="flex min-h-full flex-1 items-center justify-center px-6 py-12">
           {demoConnecting ? (
-            <div className="font-mono text-xs uppercase tracking-[0.3em] text-ember-500">
+            <div className="font-mono text-xs uppercase tracking-[0.3em] text-accent">
               Handshaking demo session…
             </div>
           ) : (
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center gap-4">
               {demoMode && !demoConfig && <DemoMisconfigNotice />}
               {demoMode && demoConfig && demoFailed && <DemoUnavailableNotice />}
               <ConnectForm />
             </div>
           )}
         </div>
-      </div>
+      </>
     )
   }
 
-  const tabs = [
-    { id: 'chat', label: 'Chat' },
-    { id: 'firstTimers', label: 'First-Timers', badgeCount: firstTimerCount },
-  ]
-
   return (
-    <div className="flex h-screen flex-col">
+    <>
       {demoMode && demoConfig && (
         <DemoBanner onSignIn={() => twitchAuthService.authorize()} />
       )}
       <ErrorBoundary label="Stream header">
         <StreamHeader />
       </ErrorBoundary>
-      <main className="flex-1 min-h-0 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 p-4">
+      <main className="flex-1 min-h-0 flex flex-col p-4">
         {isMultiActive ? (
-          <section className="flex flex-col min-h-0 border border-ink-800 bg-ink-900/40">
+          <section className="flex-1 min-h-0 flex flex-col border border-border bg-surface/40 rounded-lg">
             <ErrorBoundary label="Multi-stream">
               <MultiStreamLayout />
             </ErrorBoundary>
           </section>
         ) : (
-          <section className="flex flex-col min-h-0 border border-ink-800 bg-ink-900/40">
-            <TabBar
-              tabs={tabs}
-              activeTabId={activeTabId}
-              onTabChange={(id) => setActiveTabId(id as 'chat' | 'firstTimers')}
-            />
-            <div className="flex-1 min-h-0">
-              {activeTabId === 'chat' ? (
-                <ErrorBoundary label="Chat">
-                  <ChatPanel />
-                </ErrorBoundary>
-              ) : (
-                <ErrorBoundary label="First-timers">
-                  <FirstTimerPanel />
-                </ErrorBoundary>
-              )}
-            </div>
-          </section>
+          <Tabs.Root defaultValue="firstTimers" className="flex-1 min-h-0 flex flex-col">
+            <Tabs.List>
+              <Tabs.Trigger value="firstTimers">
+                First-Timers
+                {firstTimerCount > 0 && (
+                  <Badge variant="accent" className="ml-2">
+                    {firstTimerCount}
+                  </Badge>
+                )}
+              </Tabs.Trigger>
+              <Tabs.Trigger value="heatmap">Heatmap</Tabs.Trigger>
+            </Tabs.List>
+            <Tabs.Content value="firstTimers" className="flex-1 min-h-0">
+              <ErrorBoundary label="First-timers">
+                <FirstTimerPanel />
+              </ErrorBoundary>
+            </Tabs.Content>
+            <Tabs.Content value="heatmap" className="flex-1 min-h-0">
+              <ErrorBoundary label="Heatmap">
+                <HeatmapPanel />
+              </ErrorBoundary>
+            </Tabs.Content>
+          </Tabs.Root>
         )}
-        <section className="flex flex-col min-h-0 border border-ink-800 bg-ink-900/40">
-          <ErrorBoundary label="Heatmap">
-            <HeatmapPanel />
-          </ErrorBoundary>
-        </section>
       </main>
+    </>
+  )
+}
+
+const ChatDockContent = () => {
+  const session = useChatStore((s) => s.session)
+  if (!session) {
+    return (
+      <div className="flex h-full items-center justify-center p-6 text-center text-xs text-text-muted">
+        Connect a channel to see chat.
+      </div>
+    )
+  }
+  return (
+    <ErrorBoundary label="Chat">
+      <ChatPanel />
+    </ErrorBoundary>
+  )
+}
+
+export const LandingView = () => {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isP = e.key === 'P' || e.key === 'p'
+      if (!isP || !e.ctrlKey || !e.shiftKey || e.altKey || e.metaKey) return
+      e.preventDefault()
+      usePerfStore.getState().toggleVisibility()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  return (
+    <>
+      <AppShell
+        top={<TopNav />}
+        rail={<LeftRail />}
+        main={
+          <MainPane>
+            <MainPaneContent />
+          </MainPane>
+        }
+        dock={
+          <ChatDock>
+            <ChatDockContent />
+          </ChatDock>
+        }
+      />
       <ErrorBoundary label="Perf overlay" fallback={() => null}>
         <PerfOverlay />
       </ErrorBoundary>
-    </div>
+    </>
   )
 }
 

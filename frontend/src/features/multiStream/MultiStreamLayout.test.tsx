@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { useMultiStreamStore } from '../../store/multiStreamStore'
 import type { ChatMessage } from '../../types/twitch'
 import { MultiStreamLayout } from './MultiStreamLayout'
+import { TooltipProvider } from '../../components/ui/Tooltip'
+
+const renderWithShell = (node: JSX.Element) =>
+  render(<TooltipProvider delayDuration={0}>{node}</TooltipProvider>)
 
 const makeMessage = (id: string, text: string): ChatMessage => ({
   id,
@@ -37,7 +41,7 @@ describe('MultiStreamLayout', () => {
     s.addStream({ login: 'bob', displayName: 'Bob', broadcasterId: 'b_bob' })
     s.addStream({ login: 'carol', displayName: 'Carol', broadcasterId: 'b_carol' })
 
-    const { container, getByText } = render(
+    const { container, getByText } = renderWithShell(
       <div style={{ height: 600 }}>
         <MultiStreamLayout />
       </div>,
@@ -76,7 +80,7 @@ describe('MultiStreamLayout', () => {
       },
     }))
 
-    const { container } = render(
+    const { container } = renderWithShell(
       <div style={{ height: 600 }}>
         <MultiStreamLayout />
       </div>,
@@ -97,7 +101,7 @@ describe('MultiStreamLayout', () => {
     s.addStream({ login: 'bob', displayName: 'Bob', broadcasterId: 'b_bob' })
     s.setDegraded('alice', true)
 
-    const { getAllByRole, queryByText } = render(
+    const { getAllByRole, queryByText } = renderWithShell(
       <div style={{ height: 600 }}>
         <MultiStreamLayout />
       </div>,

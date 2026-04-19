@@ -1,5 +1,6 @@
 import { Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import { useHeatmapData } from '../../hooks/useHeatmapData'
+import { tokenRgb, tokenRgba, type Token } from '../../lib/theme'
 import type { EventAnnotation, HeatmapDataPoint } from '../../types/twitch'
 
 export const formatTickMMSS = (startMs: number, ts: number): string => {
@@ -9,9 +10,25 @@ export const formatTickMMSS = (startMs: number, ts: number): string => {
   return `${mm}:${ss}`
 }
 
-// ember-500, cobalt-400, sage-400 — used in multi mode via direct stroke={hex}
-// since Tailwind utility classes don't reach SVG stroke attributes.
-const MULTI_PALETTE = ['#f5a524', '#58a6ff', '#7ee0a6']
+// Recharts wants SVG stroke strings, not Tailwind classes. We drive these from
+// our CSS variable tokens so the chart re-tints automatically in light mode.
+const MULTI_PALETTE_TOKENS: Token[] = ['accent', 'success', 'warning']
+const MULTI_PALETTE: string[] = MULTI_PALETTE_TOKENS.map((t) => tokenRgb(t))
+
+const annotationColor = (type: EventAnnotation['type']): string => {
+  switch (type) {
+    case 'raid':
+      return tokenRgb('warning')
+    case 'subscription':
+    case 'gift_sub':
+      return tokenRgb('accent')
+    case 'hype_train_begin':
+    case 'hype_train_end':
+      return tokenRgb('danger')
+    default:
+      return tokenRgb('textMuted')
+  }
+}
 
 interface MultiStreamSeries {
   login: string
@@ -32,7 +49,7 @@ export const EngagementChart = () => {
   if (dataPoints.length === 0) {
     return (
       <div className="flex h-full w-full items-center justify-center">
-        <p className="font-mono text-sm text-ink-500">Waiting for chat…</p>
+        <p className="font-mono text-sm text-text-muted">Waiting for chat…</p>
       </div>
     )
   }
@@ -40,6 +57,9 @@ export const EngagementChart = () => {
   const startMs = dataPoints[0].timestamp
   const formatTick = (ts: number): string =>
     dataPoints.length === 0 ? '' : formatTickMMSS(startMs, ts)
+
+  const axisStroke = tokenRgba('textMuted', 0.3)
+  const mainStroke = tokenRgb('accent')
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -51,26 +71,35 @@ export const EngagementChart = () => {
           tickFormatter={formatTick}
           tickCount={5}
           interval="preserveStartEnd"
-          stroke="#a3a3ad"
+          stroke={axisStroke}
         />
-        <YAxis domain={[0, 'auto']} allowDecimals={false} stroke="#a3a3ad" />
+        <YAxis domain={[0, 'auto']} allowDecimals={false} stroke={axisStroke} />
         <Line
           type="monotone"
           dataKey="msgPerSec"
-          stroke="#f5a524"
+          stroke={mainStroke}
           strokeWidth={2}
           dot={false}
           isAnimationActive={false}
         />
-        {annotations.map((a) => (
-          <ReferenceLine
-            key={`${a.timestamp}-${a.type}`}
-            x={a.timestamp}
-            stroke="#a3a3ad"
-            strokeDasharray="3 3"
-            label={{ value: a.label, fill: '#a3a3ad', fontSize: 10, position: 'top' }}
-          />
-        ))}
+        {annotations.map((a) => {
+          const color = annotationColor(a.type)
+          return (
+            <ReferenceLine
+              key={`${a.timestamp}-${a.type}`}
+              x={a.timestamp}
+              stroke={color}
+              strokeDasharray="3 3"
+              label={{
+                value: a.label,
+                fill: color,
+                fontSize: 10,
+                position: 'top',
+                style: { backgroundColor: tokenRgba('warning', 0.4) },
+              }}
+            />
+          )
+        })}
       </LineChart>
     </ResponsiveContainer>
   )
@@ -86,7 +115,7 @@ const MultiChart = ({ streams }: MultiChartProps) => {
   if (activeStreams.length === 0) {
     return (
       <div className="flex h-full w-full items-center justify-center">
-        <p className="font-mono text-sm text-ink-500">Waiting for chat…</p>
+        <p className="font-mono text-sm text-text-muted">Waiting for chat…</p>
       </div>
     )
   }
@@ -106,6 +135,9 @@ const MultiChart = ({ streams }: MultiChartProps) => {
     })),
   )
 
+  const axisStroke = tokenRgba('textMuted', 0.3)
+  const legendColor = tokenRgb('textMuted')
+
   return (
     <ResponsiveContainer width="100%" height="100%">
       <LineChart margin={{ top: 16, right: 16, bottom: 8, left: 8 }}>
@@ -116,11 +148,11 @@ const MultiChart = ({ streams }: MultiChartProps) => {
           tickFormatter={formatTick}
           tickCount={5}
           interval="preserveStartEnd"
-          stroke="#a3a3ad"
+          stroke={axisStroke}
           allowDuplicatedCategory={false}
         />
-        <YAxis domain={[0, 'auto']} allowDecimals={false} stroke="#a3a3ad" />
-        <Legend wrapperStyle={{ color: '#a3a3ad' }} />
+        <YAxis domain={[0, 'auto']} allowDecimals={false} stroke={axisStroke} />
+        <Legend wrapperStyle={{ color: legendColor }} />
         {streams.map((s, idx) => (
           <Line
             key={s.login}
@@ -134,15 +166,18 @@ const MultiChart = ({ streams }: MultiChartProps) => {
             isAnimationActive={false}
           />
         ))}
-        {annotationEntries.map((a) => (
-          <ReferenceLine
-            key={a.key}
-            x={a.timestamp}
-            stroke="#a3a3ad"
-            strokeDasharray="3 3"
-            label={{ value: a.label, fill: '#a3a3ad', fontSize: 10, position: 'top' }}
-          />
-        ))}
+        {annotationEntries.map((a) => {
+          const color = annotationColor(a.type)
+          return (
+            <ReferenceLine
+              key={a.key}
+              x={a.timestamp}
+              stroke={color}
+              strokeDasharray="3 3"
+              label={{ value: a.label, fill: color, fontSize: 10, position: 'top' }}
+            />
+          )
+        })}
       </LineChart>
     </ResponsiveContainer>
   )

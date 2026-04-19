@@ -2,10 +2,10 @@ import { memo } from 'react'
 import type { AnnouncementColor, SubTier, SystemEvent } from '../../types/twitch'
 
 const ROW_CLASS =
-  'flex items-center gap-2 px-3 py-1 bg-ink-800/60 text-ink-100 text-sm leading-tight'
+  'flex items-center gap-2 px-3 py-1 bg-surface-raised/40 text-text text-sm leading-tight'
 
 const PILL_CLASS =
-  'inline-flex items-center px-1.5 py-0.5 rounded-full bg-ink-700 text-xs text-ink-300'
+  'inline-flex items-center px-1.5 py-0.5 rounded-full bg-surface-hover text-xs text-text-muted'
 
 const tierLabel = (tier: SubTier): string => {
   if (tier === '3000') return '3'
@@ -13,12 +13,16 @@ const tierLabel = (tier: SubTier): string => {
   return '1'
 }
 
+// Announcement-bar color → semantic token mapping.
+// PRIMARY → neutral text-muted (project-default "primary" announcement);
+// PURPLE / BLUE → accent (two highlight tints share the brand accent);
+// GREEN → success; ORANGE → warning.
 const ANNOUNCEMENT_COLORS: Record<AnnouncementColor, string> = {
-  PRIMARY: '#f5a524', // ember-500 (project accent)
-  BLUE: '#3B82F6',
-  GREEN: '#10B981',
-  ORANGE: '#F59E0B',
-  PURPLE: '#8B5CF6',
+  PRIMARY: 'rgb(var(--text-muted))',
+  BLUE: 'rgb(var(--accent))',
+  GREEN: 'rgb(var(--success))',
+  ORANGE: 'rgb(var(--warning))',
+  PURPLE: 'rgb(var(--accent))',
 }
 
 function renderByKind(event: SystemEvent): JSX.Element {
