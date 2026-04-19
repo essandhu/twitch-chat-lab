@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ThemeProvider } from '../ThemeProvider'
 import { TooltipProvider } from '../ui/Tooltip'
 import { ToastProvider } from '../ui/Toast'
@@ -25,9 +25,20 @@ type ShellSectionProps = {
   main: ReactNode
   dock: ReactNode
   reducedMotion: boolean
+  firstMount: boolean
 }
 
-const MobileShell = ({ top, rail, main, dock, reducedMotion }: ShellSectionProps) => {
+const firstMountAttr = (firstMount: boolean) =>
+  firstMount ? { 'data-first-mount': 'true' } : {}
+
+const MobileShell = ({
+  top,
+  rail,
+  main,
+  dock,
+  reducedMotion,
+  firstMount,
+}: ShellSectionProps) => {
   const [railOpen, setRailOpen] = useState(false)
   const [dockOpen, setDockOpen] = useState(false)
 
@@ -50,13 +61,18 @@ const MobileShell = ({ top, rail, main, dock, reducedMotion }: ShellSectionProps
       className="grid h-full w-full"
       style={{ gridTemplateRows: '56px 1fr', gridTemplateColumns: '1fr' }}
     >
-      <div data-shell-section="top-nav" style={{ gridRow: '1' }}>
+      <div
+        data-shell-section="top-nav"
+        style={{ gridRow: '1' }}
+        {...firstMountAttr(firstMount)}
+      >
         {withLeadingRailTrigger(top, hamburger)}
       </div>
       <div
         data-shell-section="main-pane"
         style={{ gridRow: '2' }}
         className="min-h-0 min-w-0"
+        {...firstMountAttr(firstMount)}
       >
         {main}
       </div>
@@ -91,7 +107,14 @@ const MobileShell = ({ top, rail, main, dock, reducedMotion }: ShellSectionProps
   )
 }
 
-const DesktopShell = ({ top, rail, main, dock, reducedMotion }: ShellSectionProps) => (
+const DesktopShell = ({
+  top,
+  rail,
+  main,
+  dock,
+  reducedMotion,
+  firstMount,
+}: ShellSectionProps) => (
   <div
     data-app-shell
     data-reduced-motion={reducedMotion ? 'true' : 'false'}
@@ -105,6 +128,7 @@ const DesktopShell = ({ top, rail, main, dock, reducedMotion }: ShellSectionProp
     <div
       data-shell-section="top-nav"
       style={{ gridColumn: '1 / -1', gridRow: '1' }}
+      {...firstMountAttr(firstMount)}
     >
       {top}
     </div>
@@ -112,6 +136,7 @@ const DesktopShell = ({ top, rail, main, dock, reducedMotion }: ShellSectionProp
       data-shell-section="left-rail"
       style={{ gridColumn: '1', gridRow: '2' }}
       className="min-h-0"
+      {...firstMountAttr(firstMount)}
     >
       {rail}
     </div>
@@ -119,6 +144,7 @@ const DesktopShell = ({ top, rail, main, dock, reducedMotion }: ShellSectionProp
       data-shell-section="main-pane"
       style={{ gridColumn: '2', gridRow: '2' }}
       className="min-h-0 min-w-0"
+      {...firstMountAttr(firstMount)}
     >
       {main}
     </div>
@@ -126,6 +152,7 @@ const DesktopShell = ({ top, rail, main, dock, reducedMotion }: ShellSectionProp
       data-shell-section="chat-dock"
       style={{ gridColumn: '3', gridRow: '2' }}
       className="min-h-0"
+      {...firstMountAttr(firstMount)}
     >
       {dock}
     </div>
@@ -136,6 +163,15 @@ export const AppShell = ({ top, rail, main, dock }: AppShellProps) => {
   const reducedMotion = useReducedMotion()
   const { isMobile, dockDefaultWidth } = useResponsiveLayout()
   const dockWithDefault = withDockDefaultWidth(dock, dockDefaultWidth)
+
+  const firstMountRef = useRef(true)
+  const [firstMount, setFirstMount] = useState(true)
+  useEffect(() => {
+    if (!firstMountRef.current) return
+    firstMountRef.current = false
+    const timer = window.setTimeout(() => setFirstMount(false), 800)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   return (
     <ThemeProvider>
@@ -148,6 +184,7 @@ export const AppShell = ({ top, rail, main, dock }: AppShellProps) => {
               main={main}
               dock={dockWithDefault}
               reducedMotion={reducedMotion}
+              firstMount={firstMount}
             />
           ) : (
             <DesktopShell
@@ -156,6 +193,7 @@ export const AppShell = ({ top, rail, main, dock }: AppShellProps) => {
               main={main}
               dock={dockWithDefault}
               reducedMotion={reducedMotion}
+              firstMount={firstMount}
             />
           )}
         </ToastProvider>

@@ -222,4 +222,40 @@ describe('AppShell', () => {
       expect(sections).not.toContain('chat-dock')
     })
   })
+
+  describe('page-load stagger (first-mount)', () => {
+    it('marks all four slot wrappers with data-first-mount="true" on initial render', () => {
+      renderShell()
+      const top = document.querySelector('[data-shell-section="top-nav"]')
+      const rail = document.querySelector('[data-shell-section="left-rail"]')
+      const main = document.querySelector('[data-shell-section="main-pane"]')
+      const dock = document.querySelector('[data-shell-section="chat-dock"]')
+      expect(top?.getAttribute('data-first-mount')).toBe('true')
+      expect(rail?.getAttribute('data-first-mount')).toBe('true')
+      expect(main?.getAttribute('data-first-mount')).toBe('true')
+      expect(dock?.getAttribute('data-first-mount')).toBe('true')
+    })
+
+    it('removes data-first-mount attribute after ~800ms', () => {
+      vi.useFakeTimers()
+      try {
+        renderShell()
+        const topBefore = document.querySelector('[data-shell-section="top-nav"]')
+        expect(topBefore?.getAttribute('data-first-mount')).toBe('true')
+        act(() => {
+          vi.advanceTimersByTime(900)
+        })
+        const top = document.querySelector('[data-shell-section="top-nav"]')
+        const rail = document.querySelector('[data-shell-section="left-rail"]')
+        const main = document.querySelector('[data-shell-section="main-pane"]')
+        const dock = document.querySelector('[data-shell-section="chat-dock"]')
+        expect(top?.getAttribute('data-first-mount')).toBeNull()
+        expect(rail?.getAttribute('data-first-mount')).toBeNull()
+        expect(main?.getAttribute('data-first-mount')).toBeNull()
+        expect(dock?.getAttribute('data-first-mount')).toBeNull()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
 })
