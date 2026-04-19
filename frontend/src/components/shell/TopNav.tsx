@@ -59,7 +59,15 @@ const isFormFieldFocused = (): boolean => {
   return false
 }
 
-export const TopNav = () => {
+export type TopNavProps = {
+  /**
+   * Optional leading element rendered at the far left of the TopNav flow, before
+   * the wordmark. AppShell passes a hamburger IconButton here in mobile layout.
+   */
+  leadingRailTrigger?: ReactNode
+}
+
+export const TopNav = ({ leadingRailTrigger }: TopNavProps = {}) => {
   const navigate = useNavigate()
   const { theme, setTheme, resolvedTheme } = useTheme()
   const searchRef = useRef<HTMLInputElement>(null)
@@ -71,6 +79,8 @@ export const TopNav = () => {
   const demo = isDemoMode()
 
   useEffect(() => {
+    // "/" focus shortcut — skipped inside form fields; preventDefault avoids
+    // Firefox's built-in quick-find trigger on "/".
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== '/') return
       if (e.ctrlKey || e.metaKey || e.altKey) return
@@ -108,6 +118,7 @@ export const TopNav = () => {
       data-top-nav
       className="h-14 bg-surface border-b border-border flex items-center px-4 gap-4 w-full"
     >
+      {leadingRailTrigger}
       {/* Left: wordmark */}
       <button
         type="button"

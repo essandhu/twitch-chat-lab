@@ -202,6 +202,35 @@ describe('ChatDock', () => {
     expect(localStorage.getItem(WIDTH_KEY)).toBe('480')
   })
 
+  it('defaultWidth prop overrides the 340 fallback when localStorage empty', () => {
+    render(
+      <ChatDock defaultWidth={300}>
+        <p>c</p>
+      </ChatDock>,
+    )
+    expect(getWidth()).toBe(300)
+  })
+
+  it('defaultWidth is ignored when a valid width is persisted', () => {
+    localStorage.setItem(WIDTH_KEY, '400')
+    render(
+      <ChatDock defaultWidth={300}>
+        <p>c</p>
+      </ChatDock>,
+    )
+    expect(getWidth()).toBe(400)
+  })
+
+  it('defaultWidth is used as fallback when persisted value is out of range', () => {
+    localStorage.setItem(WIDTH_KEY, '900')
+    render(
+      <ChatDock defaultWidth={320}>
+        <p>c</p>
+      </ChatDock>,
+    )
+    expect(getWidth()).toBe(320)
+  })
+
   it('clicking the collapsed "Chat" tab re-expands the dock', async () => {
     localStorage.setItem(COLLAPSED_KEY, 'true')
     const user = userEvent.setup()

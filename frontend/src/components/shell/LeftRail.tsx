@@ -3,17 +3,27 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/cn'
 import { Avatar } from '../ui/Avatar'
 import { Tooltip } from '../ui/Tooltip'
+import { useIsBelow } from '../../hooks/useIsBelow'
 import { useMultiStreamStore } from '../../store/multiStreamStore'
 
 const STORAGE_KEY = 'tcl.rail.collapsed'
 
-const readCollapsed = (): boolean => {
-  if (typeof window === 'undefined') return false
+const readPersistedCollapsed = (): boolean | null => {
+  if (typeof window === 'undefined') return null
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === 'true'
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (raw === 'true') return true
+    if (raw === 'false') return false
+    return null
   } catch {
-    return false
+    return null
   }
+}
+
+const readInitialCollapsed = (autoCollapse: boolean): boolean => {
+  const persisted = readPersistedCollapsed()
+  if (persisted !== null) return persisted
+  return autoCollapse
 }
 
 const isEditableTarget = (el: Element | null): boolean => {
@@ -135,7 +145,10 @@ export const LeftRail = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const streams = useMultiStreamStore((s) => s.streams)
-  const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsed())
+  const shouldAutoCollapse = useIsBelow(1280)
+  const [collapsed, setCollapsed] = useState<boolean>(() =>
+    readInitialCollapsed(shouldAutoCollapse),
+  )
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -150,6 +163,7 @@ export const LeftRail = () => {
   }
 
   useEffect(() => {
+    // Ctrl+B (not Cmd+B) on all platforms — avoids macOS rich-text "bold" conflict.
     const handler = (e: KeyboardEvent) => {
       if (!(e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey)) return
       if (e.key.toLowerCase() !== 'b') return

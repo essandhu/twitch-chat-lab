@@ -4,6 +4,11 @@ import { cn } from '../../lib/cn'
 export type ChatDockProps = {
   children: ReactNode
   className?: string
+  /**
+   * Fallback width (in px) when no valid value is persisted in localStorage.
+   * Clamped into [MIN_WIDTH, MAX_WIDTH]. Defaults to 340.
+   */
+  defaultWidth?: number
 }
 
 const WIDTH_KEY = 'tcl.chat-dock.width'
@@ -17,12 +22,13 @@ const COLLAPSED_WIDTH = 40
 const clamp = (n: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, n))
 
-const readInitialWidth = (): number => {
-  if (typeof localStorage === 'undefined') return DEFAULT_WIDTH
+const readInitialWidth = (fallback: number): number => {
+  const clampedFallback = clamp(fallback, MIN_WIDTH, MAX_WIDTH)
+  if (typeof localStorage === 'undefined') return clampedFallback
   const raw = localStorage.getItem(WIDTH_KEY) ?? ''
   const parsed = parseInt(raw, 10)
-  if (Number.isNaN(parsed)) return DEFAULT_WIDTH
-  if (parsed < MIN_WIDTH || parsed > MAX_WIDTH) return DEFAULT_WIDTH
+  if (Number.isNaN(parsed)) return clampedFallback
+  if (parsed < MIN_WIDTH || parsed > MAX_WIDTH) return clampedFallback
   return parsed
 }
 
@@ -92,8 +98,8 @@ const useResizeDrag = (
   return { onPointerDown }
 }
 
-export const ChatDock = ({ children, className }: ChatDockProps) => {
-  const [width, setWidth] = useState<number>(() => readInitialWidth())
+export const ChatDock = ({ children, className, defaultWidth = DEFAULT_WIDTH }: ChatDockProps) => {
+  const [width, setWidth] = useState<number>(() => readInitialWidth(defaultWidth))
   const [collapsed, setCollapsed] = useState<boolean>(() => readInitialCollapsed())
   const widthRef = useRef(width)
   widthRef.current = width
@@ -113,6 +119,7 @@ export const ChatDock = ({ children, className }: ChatDockProps) => {
   }, [])
 
   useEffect(() => {
+    // Ctrl+Shift+C only — reject Cmd/meta to avoid macOS copy + browser devtools conflicts.
     const handler = (e: KeyboardEvent) => {
       if (!e.ctrlKey || !e.shiftKey || e.metaKey || e.altKey) return
       if (e.key.toLowerCase() !== 'c') return

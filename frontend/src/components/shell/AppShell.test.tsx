@@ -11,6 +11,11 @@ type FakeMedia = {
   listeners: Set<MediaListener>
   matches: boolean
   fire: (matches: boolean) => void
+  /**
+   * Optional per-query matcher. When set, `matchMedia(q)` returns `matches`
+   * based on this function for that query. Falls back to `media.matches`.
+   */
+  queryMatcher?: (query: string) => boolean
 }
 
 let media: FakeMedia
@@ -27,11 +32,12 @@ beforeEach(() => {
   }
   vi.stubGlobal(
     'matchMedia',
-    vi.fn().mockImplementation(() => ({
+    vi.fn().mockImplementation((q: string) => ({
       get matches() {
+        if (media.queryMatcher) return media.queryMatcher(q)
         return media.matches
       },
-      media: '(prefers-reduced-motion: reduce)',
+      media: q,
       onchange: null,
       addEventListener: (_evt: string, cb: MediaListener) => {
         media.listeners.add(cb)
@@ -139,10 +145,16 @@ describe('AppShell', () => {
   it('flips data-reduced-motion when matchMedia change event fires', () => {
     media.matches = true
     renderShell()
-    const grid = document.querySelector('[data-app-shell]')
-    expect(grid?.getAttribute('data-reduced-motion')).toBe('true')
+    // Re-query after each state change: changing the global `media.matches`
+    // affects every matchMedia listener, including the responsive-layout ones,
+    // which can swap the mobile/desktop shell and detach the previous grid.
+    expect(
+      document.querySelector('[data-app-shell]')?.getAttribute('data-reduced-motion'),
+    ).toBe('true')
     act(() => media.fire(false))
-    expect(grid?.getAttribute('data-reduced-motion')).toBe('false')
+    expect(
+      document.querySelector('[data-app-shell]')?.getAttribute('data-reduced-motion'),
+    ).toBe('false')
   })
 
   it('cleans up matchMedia listener on unmount', () => {
@@ -150,5 +162,64 @@ describe('AppShell', () => {
     expect(media.listeners.size).toBeGreaterThan(0)
     unmount()
     expect(media.listeners.size).toBe(0)
+  })
+
+  describe('responsive layout', () => {
+    // A minimal TopNav-like stand-in that honors the `leadingRailTrigger` slot
+    // just like the real TopNav does.
+    const FakeTopNav = ({
+      leadingRailTrigger,
+    }: {
+      leadingRailTrigger?: React.ReactNode
+    }) => (
+      <div data-fake-topnav>
+        {leadingRailTrigger}
+        <span>top-content</span>
+      </div>
+    )
+
+    it('desktop (≥ 1440): no hamburger, no floating chat toggle, grid 3-column', () => {
+      media.queryMatcher = () => false
+      renderShell({ top: <FakeTopNav /> })
+      expect(screen.queryByLabelText(/open navigation/i)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/open chat/i)).not.toBeInTheDocument()
+      const grid = document.querySelector('[data-app-shell]') as HTMLElement
+      expect(grid.getAttribute('data-layout')).toBe('desktop')
+    })
+
+    it('mobile (< 768): hamburger button present and floating chat toggle present', () => {
+      media.queryMatcher = (q: string) => {
+        // All useIsBelow queries match mobile breakpoints
+        if (q.includes('767px')) return true
+        if (q.includes('1023px')) return true
+        if (q.includes('1279px')) return true
+        if (q.includes('1439px')) return true
+        return false
+      }
+      renderShell({ top: <FakeTopNav /> })
+      expect(screen.getByLabelText(/open navigation/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/open chat/i)).toBeInTheDocument()
+      const grid = document.querySelector('[data-app-shell]') as HTMLElement
+      expect(grid.getAttribute('data-layout')).toBe('mobile')
+    })
+
+    it('mobile: rail and dock are NOT inline in the grid', () => {
+      media.queryMatcher = (q: string) =>
+        q.includes('767px') ||
+        q.includes('1023px') ||
+        q.includes('1279px') ||
+        q.includes('1439px')
+      renderShell({ top: <FakeTopNav /> })
+      const grid = document.querySelector('[data-app-shell]') as HTMLElement
+      // Grid direct children: only top-nav + main-pane should be present.
+      const directChildren = Array.from(grid.children) as HTMLElement[]
+      const sections = directChildren
+        .map((el) => el.getAttribute('data-shell-section'))
+        .filter((v): v is string => v !== null)
+      expect(sections).toContain('top-nav')
+      expect(sections).toContain('main-pane')
+      expect(sections).not.toContain('left-rail')
+      expect(sections).not.toContain('chat-dock')
+    })
   })
 })

@@ -1,10 +1,30 @@
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { TooltipProvider } from '../ui/Tooltip'
 import { useMultiStreamStore } from '../../store/multiStreamStore'
 import { LeftRail } from './LeftRail'
+
+type MediaListener = (e: MediaQueryListEvent) => void
+
+const stubMatchMedia = (matcher: (q: string) => boolean) => {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockImplementation((q: string) => ({
+      get matches() {
+        return matcher(q)
+      },
+      media: q,
+      onchange: null,
+      addEventListener: (_evt: string, _cb: MediaListener) => {},
+      removeEventListener: (_evt: string, _cb: MediaListener) => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })),
+  )
+}
 
 vi.mock('../../store/multiStreamStore', () => ({
   useMultiStreamStore: vi.fn(),
@@ -41,6 +61,11 @@ const renderRail = (initialPath = '/') =>
 beforeEach(() => {
   localStorage.removeItem('tcl.rail.collapsed')
   setStreams({})
+  stubMatchMedia(() => false)
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('LeftRail', () => {
@@ -138,6 +163,36 @@ describe('LeftRail', () => {
     })
 
     expect(root.style.width).toBe('240px')
+  })
+
+  it('auto-collapses when no persisted value and viewport < 1280', () => {
+    stubMatchMedia((q: string) => q.includes('1279px'))
+    const { container } = renderRail()
+    const root = container.querySelector('[data-shell-section="left-rail"]') as HTMLElement
+    expect(root.style.width).toBe('60px')
+  })
+
+  it('does NOT auto-collapse when viewport ≥ 1280', () => {
+    stubMatchMedia(() => false)
+    const { container } = renderRail()
+    const root = container.querySelector('[data-shell-section="left-rail"]') as HTMLElement
+    expect(root.style.width).toBe('240px')
+  })
+
+  it('respects persisted "false" even when viewport < 1280', () => {
+    localStorage.setItem('tcl.rail.collapsed', 'false')
+    stubMatchMedia((q: string) => q.includes('1279px'))
+    const { container } = renderRail()
+    const root = container.querySelector('[data-shell-section="left-rail"]') as HTMLElement
+    expect(root.style.width).toBe('240px')
+  })
+
+  it('respects persisted "true" even when viewport ≥ 1280', () => {
+    localStorage.setItem('tcl.rail.collapsed', 'true')
+    stubMatchMedia(() => false)
+    const { container } = renderRail()
+    const root = container.querySelector('[data-shell-section="left-rail"]') as HTMLElement
+    expect(root.style.width).toBe('60px')
   })
 
   it('renders differently when collapsed (tracked section header hidden)', async () => {
