@@ -53,13 +53,12 @@ jobs:
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Upload refreshed baselines as artifact
-        if: steps.diff.outputs.changed == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: visual-baselines-${{ inputs.ref }}
-          path: frontend/tests/e2e/__screenshots__/
-          retention-days: 14
+          # Artifact names can't contain '/', so collapse path separators in
+          # branch refs (e.g. fix/foo → fix-foo) before using ref in the name.
+          safe_ref=$(echo "${{ inputs.ref }}" | tr '/' '-')
+          echo "safe_ref=$safe_ref" >> "$GITHUB_OUTPUT"
+      # Commit BEFORE artifact upload: if the artifact step fails (for any
+      # reason), the refreshed baselines still land on the branch.
       - name: Commit + push refreshed baselines
         if: steps.diff.outputs.changed == 'true'
         run: |
@@ -71,6 +70,13 @@ jobs:
           Regenerated on ubuntu-latest via .github/workflows/update-visual-baselines.yml.
           Ref: ${{ inputs.ref }}"
           git push origin HEAD:${{ inputs.ref }}
+      - name: Upload refreshed baselines as artifact
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines-${{ steps.diff.outputs.safe_ref }}
+          path: frontend/tests/e2e/__screenshots__/
+          retention-days: 14
       - name: Write job summary
         run: |
           {
