@@ -11,7 +11,7 @@ export const MainPane = forwardRef<HTMLDivElement, MainPaneProps>(
     <div
       ref={ref}
       data-shell-section="main-pane-inner"
-      className={cn('flex min-h-0 flex-col overflow-hidden', className)}
+      className={cn('flex h-full min-h-0 flex-col overflow-hidden', className)}
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-auto">{children}</div>
     </div>
