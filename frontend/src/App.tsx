@@ -131,6 +131,8 @@ const ChatDockContent = () => {
 }
 
 export const LandingView = () => {
+  const isMultiActive = useMultiStreamStore((s) => s.isActive)
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const isP = e.key === 'P' || e.key === 'p'
@@ -153,7 +155,7 @@ export const LandingView = () => {
           </MainPane>
         }
         dock={
-          <ChatDock>
+          <ChatDock forceCollapsed={isMultiActive}>
             <ChatDockContent />
           </ChatDock>
         }
