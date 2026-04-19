@@ -74,7 +74,7 @@ export function StreamHeader(): JSX.Element | null {
   }
 
   return (
-    <header className="flex items-baseline gap-6 border-b border-border bg-surface px-6 py-4">
+    <header className="flex items-center gap-6 border-b border-border bg-surface px-6 py-4">
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           <h1 className="font-display text-lg text-text line-clamp-1">

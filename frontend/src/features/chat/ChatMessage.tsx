@@ -30,20 +30,19 @@ function IntroBadge() {
 
 function relativeTime(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
-  if (seconds < 30) return 'just now'
-  if (seconds < 60) return `${seconds}s ago`
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
-  return `${Math.floor(seconds / 86400)}d ago`
+  if (seconds < 60) return 'now'
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`
+  return `${Math.floor(seconds / 86400)}d`
 }
 
 function FirstTimerTag({ timestamp }: { timestamp: Date }) {
   return (
     <span
-      className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent/80"
+      className="ml-auto shrink-0 pl-2 font-mono text-[10px] tracking-wide text-accent/70"
       title={`First time this session · ${timestamp.toLocaleTimeString()}`}
     >
-      first · {relativeTime(timestamp)}
+      {relativeTime(timestamp)}
     </span>
   )
 }
@@ -73,10 +72,10 @@ function ChatMessageInner({ message }: ChatMessageProps): JSX.Element {
       >
         {message.displayName}
       </span>
-      {message.isFirstInSession ? <FirstTimerTag timestamp={message.timestamp} /> : null}
       <span className="text-text-muted mr-1">:</span>
       {message.cheer ? <CheerPill bits={message.cheer.bits} /> : null}
       <EmoteText fragments={message.fragments} cheerTierColor={cheerColor} />
+      {message.isFirstInSession ? <FirstTimerTag timestamp={message.timestamp} /> : null}
     </>
   )
 
