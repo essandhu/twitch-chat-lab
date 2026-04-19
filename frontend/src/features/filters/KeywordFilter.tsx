@@ -5,21 +5,21 @@ export const KeywordFilter = () => {
   const setFilterState = useChatStore((s) => s.setFilterState)
 
   return (
-    <div className="inline-flex items-center border border-ink-700 bg-ink-900">
+    <div className="inline-flex items-center border border-border bg-surface">
       <input
         type="text"
         aria-label="Keyword filter"
         placeholder="Filter by keyword..."
         value={keyword}
         onChange={(e) => setFilterState({ keyword: e.target.value })}
-        className="bg-transparent text-ink-100 placeholder:text-ink-500 text-xs font-mono px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ember-500"
+        className="bg-transparent text-text placeholder:text-text-muted text-xs font-mono px-2 py-1 focus:outline-none focus:ring-1 focus:ring-accent"
       />
       {keyword !== '' && (
         <button
           type="button"
           aria-label="Clear keyword"
           onClick={() => setFilterState({ keyword: '' })}
-          className="px-2 py-1 text-ink-500 hover:text-ember-500 font-mono text-xs"
+          className="px-2 py-1 text-text-muted hover:text-accent font-mono text-xs"
         >
           ×
         </button>

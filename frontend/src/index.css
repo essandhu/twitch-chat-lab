@@ -3,6 +3,38 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg: 14 14 16;
+    --surface: 24 24 27;
+    --surface-raised: 31 31 35;
+    --surface-hover: 38 38 44;
+    --border: 47 47 53;
+    --text: 239 239 241;
+    --text-muted: 173 173 184;
+    --accent: 145 71 255;
+    --accent-hover: 160 94 255;
+    --accent-contrast: 255 255 255;
+    --danger: 235 4 0;
+    --success: 0 245 147;
+    --warning: 245 165 36;
+  }
+
+  [data-theme='light'] {
+    --bg: 247 247 248;
+    --surface: 255 255 255;
+    --surface-raised: 255 255 255;
+    --surface-hover: 235 235 238;
+    --border: 219 219 223;
+    --text: 24 24 27;
+    --text-muted: 83 83 95;
+    --accent: 126 61 226;
+    --accent-hover: 108 47 204;
+    --accent-contrast: 255 255 255;
+    --danger: 176 0 0;
+    --success: 0 164 95;
+    --warning: 176 115 0;
+  }
+
   html,
   body,
   #root {
@@ -14,8 +46,8 @@
     font-feature-settings: 'ss01', 'cv11';
     -webkit-font-smoothing: antialiased;
     background-image:
-      radial-gradient(circle at 18% 12%, rgba(245, 165, 36, 0.06), transparent 40%),
-      radial-gradient(circle at 82% 88%, rgba(90, 90, 120, 0.08), transparent 45%);
+      radial-gradient(circle at 18% 12%, rgb(var(--accent) / 0.06), transparent 40%),
+      radial-gradient(circle at 82% 88%, rgb(var(--border) / 0.08), transparent 45%);
   }
 }
 
@@ -45,5 +77,60 @@
     .animate-first-timer-slide-in {
       animation: slideIn 200ms ease-out both;
     }
+  }
+
+  @keyframes cheerPillBounce {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .cheer-pill-bounce {
+      animation: cheerPillBounce 180ms ease-out both;
+    }
+  }
+
+  @keyframes shellFadeSlide {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    [data-first-mount='true'][data-shell-section='top-nav'] {
+      animation: shellFadeSlide 360ms ease-out 0ms both;
+    }
+    [data-first-mount='true'][data-shell-section='left-rail'] {
+      animation: shellFadeSlide 360ms ease-out 120ms both;
+    }
+    [data-first-mount='true'][data-shell-section='main-pane'] {
+      animation: shellFadeSlide 360ms ease-out 240ms both;
+    }
+    [data-first-mount='true'][data-shell-section='chat-dock'] {
+      animation: shellFadeSlide 360ms ease-out 360ms both;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
   }
 }

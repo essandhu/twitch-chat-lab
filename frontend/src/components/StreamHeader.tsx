@@ -4,6 +4,7 @@ import { twitchHelixClient } from '../features/auth/authServices'
 import { logger } from '../lib/logger'
 import { StreamSelector, type StreamPick } from '../features/multiStream/StreamSelector'
 import { startCompare } from '../features/multiStream/multiStreamService'
+import { Button } from './ui/Button'
 
 export function StreamHeader(): JSX.Element | null {
   const session = useChatStore((s) => s.session)
@@ -73,37 +74,39 @@ export function StreamHeader(): JSX.Element | null {
   }
 
   return (
-    <header className="flex items-baseline gap-6 border-b border-ink-800 bg-ink-900/40 px-6 py-4">
+    <header className="flex items-baseline gap-6 border-b border-border bg-surface px-6 py-4">
       <div className="min-w-0 flex-1">
-        <h1 className="font-display text-lg text-ink-100 line-clamp-1">
+        <h1 className="font-display text-lg text-text line-clamp-1">
           {session.streamTitle || '—'}
         </h1>
-        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-500">
+        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-text-muted">
           {session.gameName || 'uncategorized'}
         </p>
       </div>
       <div className="flex items-center gap-3">
-        <button
+        <Button
           type="button"
+          variant="secondary"
+          size="sm"
           disabled={!canCompare}
           title={compareTitle}
           onClick={() => setSelectorOpen(true)}
-          className={`border border-ink-700 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.22em] ${
-            canCompare
-              ? 'text-ink-100 hover:bg-ink-800'
-              : 'text-ink-500 cursor-not-allowed'
-          }`}
+          className="font-mono uppercase tracking-[0.22em]"
         >
           Compare streams
-        </button>
+        </Button>
         {isOffline ? (
-          <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-500">
+          <span className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-text-muted">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-danger" />
             offline
           </span>
         ) : (
           <span className="flex items-center gap-2">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-ember-500" />
-            <span className="font-mono text-sm text-ink-100">
+            <span className="relative inline-block h-1.5 w-1.5">
+              <span className="absolute inset-0 animate-ping rounded-full bg-success/60" />
+              <span className="absolute inset-0 rounded-full bg-success" />
+            </span>
+            <span className="font-mono text-sm text-text">
               {session.viewerCount.toLocaleString('en-US')} viewers
             </span>
           </span>

@@ -16,8 +16,8 @@ test('first-timer tab shows live count + entries; re-seen users do not increment
 
   await tab.click()
 
-  // Entries are <article>; usernames are links to twitch.tv/{login}.
-  const entries = page.locator('article')
+  // Entries carry role="article"; usernames are links to twitch.tv/{login}.
+  const entries = page.getByRole('article')
   await expect.poll(async () => await entries.count(), { timeout: 5_000 }).toBe(5)
 
   for (const u of newcomers) {
@@ -39,7 +39,7 @@ test('first-timer tab shows live count + entries; re-seen users do not increment
   await expect(tab).toContainText('6')
   await expect.poll(async () => await entries.count(), { timeout: 5_000 }).toBe(6)
 
-  // Switch back to chat tab — ChatList is visible again.
-  await page.getByRole('tab', { name: /^chat/i }).click()
+  // Chat always lives in the ChatDock (no longer a tab) — assert it's visible
+  // alongside the First-Timers tab content.
   await expect(page.getByTestId('chat-list')).toBeVisible()
 })

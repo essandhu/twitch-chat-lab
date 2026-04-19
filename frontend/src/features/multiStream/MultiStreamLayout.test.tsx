@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { useMultiStreamStore } from '../../store/multiStreamStore'
 import type { ChatMessage } from '../../types/twitch'
 import { MultiStreamLayout } from './MultiStreamLayout'
+import { TooltipProvider } from '../../components/ui/Tooltip'
+
+const renderWithShell = (node: JSX.Element) =>
+  render(<TooltipProvider delayDuration={0}>{node}</TooltipProvider>)
 
 const makeMessage = (id: string, text: string): ChatMessage => ({
   id,
@@ -16,6 +20,7 @@ const makeMessage = (id: string, text: string): ChatMessage => ({
   isFirstInSession: false,
   isHighlighted: false,
   timestamp: new Date(),
+  messageType: 'text',
 })
 
 describe('MultiStreamLayout', () => {
@@ -36,7 +41,7 @@ describe('MultiStreamLayout', () => {
     s.addStream({ login: 'bob', displayName: 'Bob', broadcasterId: 'b_bob' })
     s.addStream({ login: 'carol', displayName: 'Carol', broadcasterId: 'b_carol' })
 
-    const { container, getByText } = render(
+    const { container, getByText } = renderWithShell(
       <div style={{ height: 600 }}>
         <MultiStreamLayout />
       </div>,
@@ -75,19 +80,19 @@ describe('MultiStreamLayout', () => {
       },
     }))
 
-    const { container } = render(
+    const { container } = renderWithShell(
       <div style={{ height: 600 }}>
         <MultiStreamLayout />
       </div>,
     )
 
     // Each ChatList produces an inner `.overflow-y-auto > div` sized by
-    // messages.length * 40px estimate. Two distinct heights prove per-slice wiring.
+    // messages.length * 28px estimate (Phase 6 per-kind: message → 28).
     const innerHeights = Array.from(
       container.querySelectorAll('.overflow-y-auto > div'),
     ).map((el) => (el as HTMLElement).style.height)
-    expect(innerHeights).toContain('80px') // alice: 2 × 40
-    expect(innerHeights).toContain('120px') // bob: 3 × 40
+    expect(innerHeights).toContain('56px') // alice: 2 × 28
+    expect(innerHeights).toContain('84px') // bob: 3 × 28
   })
 
   it('shows the "Connection lost" banner on a degraded slice', () => {
@@ -96,7 +101,7 @@ describe('MultiStreamLayout', () => {
     s.addStream({ login: 'bob', displayName: 'Bob', broadcasterId: 'b_bob' })
     s.setDegraded('alice', true)
 
-    const { getAllByRole, queryByText } = render(
+    const { getAllByRole, queryByText } = renderWithShell(
       <div style={{ height: 600 }}>
         <MultiStreamLayout />
       </div>,

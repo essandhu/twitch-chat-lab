@@ -43,11 +43,15 @@ const makeMessage = (id: string, text: string): ChatMessage => ({
   isFirstInSession: false,
   isHighlighted: false,
   timestamp: new Date(),
+  messageType: 'text',
 })
 
 const seedStoreMessage = (text: string) => {
+  const msg = makeMessage('store', text)
   useChatStore.setState({
-    messages: [makeMessage('store', text)],
+    messages: [msg],
+    rows: [{ kind: 'message', id: msg.id, message: msg }],
+    messagesById: { [msg.id]: msg },
     firstTimers: [],
     seenUserIds: new Set<string>(),
     badgeDefinitions: {},
@@ -103,8 +107,8 @@ describe('ChatList messagesOverride prop', () => {
 
     const inner = container.querySelector('.overflow-y-auto > div') as HTMLElement
     expect(inner).not.toBeNull()
-    // 4 override messages × 40 px estimate.
-    expect(inner.style.height).toBe('160px')
+    // Per-kind size from P6-12: message → 28 px; 4 rows × 28 = 112 px.
+    expect(inner.style.height).toBe('112px')
   })
 
   it('falls back to the store when messagesOverride is not provided', () => {
@@ -118,7 +122,7 @@ describe('ChatList messagesOverride prop', () => {
 
     const inner = container.querySelector('.overflow-y-auto > div') as HTMLElement
     expect(inner).not.toBeNull()
-    // 1 store message × 40 px estimate.
-    expect(inner.style.height).toBe('40px')
+    // Per-kind size from P6-12: message → 28 px.
+    expect(inner.style.height).toBe('28px')
   })
 })

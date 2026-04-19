@@ -147,7 +147,11 @@ describe('EngagementChart', () => {
 })
 
 describe('EngagementChart — multi-stream mode', () => {
-  const palette = ['#f5a524', '#58a6ff', '#7ee0a6']
+  const palette = [
+    'rgb(var(--accent))',
+    'rgb(var(--success))',
+    'rgb(var(--warning))',
+  ]
 
   const seedMultiMode = (slices: Array<{ login: string; displayName: string }>): void => {
     const store = useMultiStreamStore.getState()
@@ -219,7 +223,7 @@ describe('EngagementChart — multi-stream mode', () => {
 
     const lines = container.querySelectorAll('path.recharts-line-curve')
     expect(lines.length).toBe(3)
-    // Each line gets the palette hex in order (rotated via modulo).
+    // Each line gets the palette token in order (rotated via modulo).
     const strokes = Array.from(lines).map((el) => el.getAttribute('stroke'))
     expect(strokes).toEqual(palette.slice(0, 3))
   })
@@ -272,6 +276,61 @@ describe('EngagementChart — multi-stream mode', () => {
     expect(
       screen.getByText((content) => /Bob\s·\sHype train!/.test(content)),
     ).toBeInTheDocument()
+  })
+})
+
+describe('EngagementChart — token-driven chart colors', () => {
+  beforeEach(() => {
+    useHeatmapStore.getState().reset()
+    if (typeof globalThis.ResizeObserver === 'undefined') {
+      globalThis.ResizeObserver = class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      } as unknown as typeof ResizeObserver
+    }
+  })
+
+  afterEach(() => {
+    document.documentElement.removeAttribute('data-theme')
+  })
+
+  const seedSingleMode = (): void => {
+    const start = 1_700_000_000_000
+    const dataPoints: HeatmapDataPoint[] = [
+      { timestamp: start, msgPerSec: 1 },
+      { timestamp: start + 1000, msgPerSec: 3 },
+      { timestamp: start + 2000, msgPerSec: 5 },
+    ]
+    useHeatmapStore.setState({ dataPoints })
+  }
+
+  it('uses rgb(var(--accent)) for the primary stroke in dark mode', () => {
+    document.documentElement.setAttribute('data-theme', 'dark')
+    seedSingleMode()
+    const { container } = render(
+      <div style={{ width: 600, height: 300 }}>
+        <EngagementChart />
+      </div>,
+    )
+    const line = container.querySelector('path.recharts-line-curve')
+    expect(line).not.toBeNull()
+    expect(line!.getAttribute('stroke')).toBe('rgb(var(--accent))')
+  })
+
+  it('uses rgb(var(--accent)) for the primary stroke in light mode', () => {
+    document.documentElement.setAttribute('data-theme', 'light')
+    seedSingleMode()
+    const { container } = render(
+      <div style={{ width: 600, height: 300 }}>
+        <EngagementChart />
+      </div>,
+    )
+    const line = container.querySelector('path.recharts-line-curve')
+    expect(line).not.toBeNull()
+    // tokenRgb() emits the same CSS-variable string regardless of theme; the
+    // browser resolves the variable per the active data-theme.
+    expect(line!.getAttribute('stroke')).toBe('rgb(var(--accent))')
   })
 })
 

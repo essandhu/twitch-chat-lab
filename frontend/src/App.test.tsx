@@ -24,6 +24,22 @@ const makeSession = (): StreamSession => ({
   isConnected: true,
 })
 
+const stubMatchMedia = () => {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockImplementation((q: string) => ({
+      matches: false,
+      media: q,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })),
+  )
+}
+
 const renderLanding = () =>
   render(
     <MemoryRouter>
@@ -34,6 +50,7 @@ const renderLanding = () =>
 describe('App / LandingView — Ctrl+Shift+P hotkey', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    stubMatchMedia()
     if (typeof globalThis.ResizeObserver === 'undefined') {
       globalThis.ResizeObserver = class {
         observe() {}
@@ -47,6 +64,7 @@ describe('App / LandingView — Ctrl+Shift+P hotkey', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.unstubAllGlobals()
     usePerfStore.getState().reset()
     useChatStore.setState({ session: null })
   })
@@ -92,14 +110,14 @@ describe('App / LandingView — Ctrl+Shift+P hotkey', () => {
     expect(usePerfStore.getState().isVisible).toBe(true)
     unmount()
     fireKey({ key: 'p', ctrlKey: true, shiftKey: true })
-    // Still true — listener was removed, no toggle back to false.
     expect(usePerfStore.getState().isVisible).toBe(true)
   })
 })
 
-describe('App / LandingView — layout with session', () => {
+describe('App / LandingView — shell layout with session', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    stubMatchMedia()
     if (typeof globalThis.ResizeObserver === 'undefined') {
       globalThis.ResizeObserver = class {
         observe() {}
@@ -113,40 +131,46 @@ describe('App / LandingView — layout with session', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.unstubAllGlobals()
     usePerfStore.getState().reset()
     useChatStore.setState({ session: null })
   })
 
-  it('renders a two-column grid (chat + heatmap) when session exists', () => {
+  it('renders AppShell with all four slots when session exists', () => {
     const { container } = renderLanding()
-    const main = container.querySelector('main')
-    expect(main).not.toBeNull()
-    expect(main?.className).toContain('grid-cols-[minmax(0,1fr)_minmax(0,1fr)]')
-    // Direct section children of <main>: chat (column 1) + heatmap (column 2).
-    const directSections = Array.from(main?.children ?? []).filter(
-      (c) => c.tagName === 'SECTION',
-    )
-    expect(directSections.length).toBe(2)
+    expect(container.querySelector('[data-shell-section="top-nav"]')).not.toBeNull()
+    expect(container.querySelector('[data-shell-section="left-rail"]')).not.toBeNull()
+    expect(container.querySelector('[data-shell-section="main-pane"]')).not.toBeNull()
+    expect(container.querySelector('[data-shell-section="chat-dock"]')).not.toBeNull()
+  })
+
+  it('renders First-Timers + Heatmap tabs inside MainPane when not in multi-stream mode', () => {
+    renderLanding()
+    expect(screen.getByRole('tab', { name: /first-timers/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /heatmap/i })).toBeInTheDocument()
   })
 })
 
 describe('App / LandingView — no session', () => {
   beforeEach(() => {
+    stubMatchMedia()
     usePerfStore.getState().reset()
     useChatStore.setState({ session: null })
   })
 
   afterEach(() => {
+    vi.unstubAllGlobals()
     usePerfStore.getState().reset()
   })
 
-  it('renders the ConnectForm landing view unchanged when session is null', () => {
-    const { container, getByText } = renderLanding()
-    // Phase 2 preserved bits.
-    expect(getByText('twitch · chat · lab')).toBeInTheDocument()
-    expect(getByText('phase 01 · foundation')).toBeInTheDocument()
-    // No <main> grid in the disconnected view.
-    expect(container.querySelector('main')).toBeNull()
+  it('renders the ConnectForm inside the shell when session is null', () => {
+    renderLanding()
+    expect(screen.getByLabelText(/twitch channel login/i)).toBeInTheDocument()
+  })
+
+  it('renders the wordmark in the top nav', () => {
+    renderLanding()
+    expect(screen.getByText(/twitch · chat · lab/i)).toBeInTheDocument()
   })
 })
 
@@ -154,6 +178,7 @@ describe('App / LandingView — demo mode', () => {
   const originalSearch = window.location.search
 
   beforeEach(() => {
+    stubMatchMedia()
     useChatStore.setState({ session: null })
     usePerfStore.getState().reset()
   })
@@ -163,6 +188,7 @@ describe('App / LandingView — demo mode', () => {
     useChatStore.setState({ session: null })
     usePerfStore.getState().reset()
     vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
 
@@ -206,7 +232,6 @@ describe('App / LandingView — demo mode', () => {
     )
 
     expect(screen.getByText(/demo mode not configured/i)).toBeInTheDocument()
-    // ConnectForm remains available as a fallback.
     expect(screen.getByLabelText(/twitch channel login/i)).toBeInTheDocument()
   })
 
@@ -228,7 +253,6 @@ describe('App / LandingView — demo mode', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(/demo unavailable/i)
     })
-    // No static fallback — ConnectForm is still offered beneath the error.
     expect(screen.getByLabelText(/twitch channel login/i)).toBeInTheDocument()
   })
 })

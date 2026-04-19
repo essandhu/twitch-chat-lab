@@ -5,6 +5,15 @@
 // implicit-grant tokens for read-only Twitch scopes are low-risk and rotatable.
 // If the token is revoked, the demo breaks until manually rotated — this is
 // called out in the README's "Known limitations" section.
+//
+// Fixture streams: scripted event playback used by the Playwright suite is
+// injected by `tests/e2e/mocks/eventsub.ts` (see `openFakeEventSub`), not by
+// this service. The `?demo=1` (`cached`) mode connects to a real Twitch
+// channel picked from a live Helix `/streams` query and surfaces whatever
+// events that channel emits — there is no synthetic fixture stream in that
+// path. Phase 6 new row types (replies, cheers, pins, system notifications,
+// message deletes, user clears, chat clears) are exercised end-to-end by the
+// Playwright mocks in `?demo=playwright` mode.
 
 export type DemoMode = 'cached' | 'fixture'
 

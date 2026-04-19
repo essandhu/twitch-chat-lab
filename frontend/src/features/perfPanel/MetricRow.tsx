@@ -1,4 +1,5 @@
 import React from 'react'
+import { cn } from '../../lib/cn'
 
 interface Props {
   label: string
@@ -8,8 +9,18 @@ interface Props {
 }
 
 const MetricRowInner = ({ label, value, degraded = false, hint }: Props) => {
-  const valueClass = degraded ? 'text-ember-400' : 'text-ink-100'
-  const labelClass = 'text-[11px] font-mono uppercase tracking-wider text-ink-300'
+  const rowClass = cn(
+    'flex items-baseline justify-between gap-3 rounded px-1',
+    degraded && 'bg-warning/10',
+  )
+  const valueClass = cn(
+    'text-[12px] font-mono text-right',
+    degraded ? 'text-warning' : 'text-text',
+  )
+  const labelClass = cn(
+    'text-[11px] font-mono uppercase tracking-wider',
+    degraded ? 'text-warning' : 'text-text-muted',
+  )
   const labelNode = hint ? (
     <span className={labelClass} title={hint} aria-label={hint}>
       {label}
@@ -18,11 +29,9 @@ const MetricRowInner = ({ label, value, degraded = false, hint }: Props) => {
     <span className={labelClass}>{label}</span>
   )
   return (
-    <div className="flex items-baseline justify-between gap-3">
+    <div className={rowClass}>
       {labelNode}
-      <span className={`${valueClass} text-[12px] font-mono text-right`}>
-        {value}
-      </span>
+      <span className={valueClass}>{value}</span>
     </div>
   )
 }

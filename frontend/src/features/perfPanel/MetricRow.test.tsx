@@ -9,18 +9,20 @@ describe('MetricRow', () => {
     expect(screen.getByText('60')).toBeInTheDocument()
   })
 
-  it('default: value has text-ink-100 and NOT text-ember-400', () => {
+  it('default: value has text-text and NOT text-warning', () => {
     render(<MetricRow label="FPS" value="60" />)
     const valueEl = screen.getByText('60')
-    expect(valueEl.className).toContain('text-ink-100')
-    expect(valueEl.className).not.toContain('text-ember-400')
+    expect(valueEl.className).toContain('text-text')
+    expect(valueEl.className).not.toContain('text-warning')
   })
 
-  it('degraded=true: value has text-ember-400 and NOT text-ink-100', () => {
+  it('degraded=true: value has text-warning and NOT text-text (base)', () => {
     render(<MetricRow label="FPS" value="28" degraded />)
     const valueEl = screen.getByText('28')
-    expect(valueEl.className).toContain('text-ember-400')
-    expect(valueEl.className).not.toContain('text-ink-100')
+    expect(valueEl.className).toContain('text-warning')
+    // Use split/includes to ensure the non-warning `text-text` class is not
+    // also present (substring match would falsely pass via text-text-muted).
+    expect(valueEl.className.split(/\s+/)).not.toContain('text-text')
   })
 
   it('hint provided: label is wrapped in element with title and aria-label', () => {

@@ -6,9 +6,10 @@ const emoteUrl = (id: string): string =>
 
 interface EmoteTextProps {
   fragments: MessageFragment[]
+  cheerTierColor?: string
 }
 
-function EmoteTextImpl({ fragments }: EmoteTextProps) {
+function EmoteTextImpl({ fragments, cheerTierColor }: EmoteTextProps) {
   return (
     <>
       {fragments.map((fragment, index) => {
@@ -22,6 +23,17 @@ function EmoteTextImpl({ fragments }: EmoteTextProps) {
               loading="lazy"
               className="inline-block align-middle h-7"
             />
+          )
+        }
+        if (fragment.type === 'cheermote' && cheerTierColor) {
+          return (
+            <span
+              key={index}
+              className="whitespace-pre-wrap font-semibold"
+              style={{ color: cheerTierColor }}
+            >
+              {fragment.text}
+            </span>
           )
         }
         return (

@@ -14,7 +14,7 @@ function BadgeIconInner({ badge }: BadgeIconProps): JSX.Element {
     return (
       <span
         title={badge.setId}
-        className="inline-block mr-1 align-middle h-[18px] w-[18px] rounded-sm bg-ink-700"
+        className="inline-block mr-1 align-middle h-[18px] w-[18px] rounded-sm bg-surface-hover"
       />
     )
   }

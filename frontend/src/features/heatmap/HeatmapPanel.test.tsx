@@ -37,7 +37,7 @@ describe('HeatmapPanel', () => {
     expect(screen.getByText('9,876')).toBeInTheDocument()
   })
 
-  it('peak card value has text-ember-400 accent class', () => {
+  it('peak card value has text-accent accent class', () => {
     useHeatmapStore.setState({ peakMsgPerSec: 9876 })
     render(
       <div style={{ width: 600, height: 400 }}>
@@ -45,7 +45,7 @@ describe('HeatmapPanel', () => {
       </div>,
     )
     const peakValueEl = screen.getByText('9,876')
-    expect(peakValueEl.className).toContain('text-ember-400')
+    expect(peakValueEl.className).toContain('text-accent')
   })
 
   it('shows the EngagementChart empty placeholder when no data points', () => {

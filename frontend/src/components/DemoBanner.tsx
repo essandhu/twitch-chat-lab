@@ -1,3 +1,5 @@
+import { Button } from './ui/Button'
+
 interface DemoBannerProps {
   onSignIn: () => void
 }
@@ -6,19 +8,18 @@ export const DemoBanner = ({ onSignIn }: DemoBannerProps) => (
   <div
     role="status"
     aria-label="Demo mode"
-    className="sticky top-0 z-40 flex h-10 items-center justify-center gap-3 border-b border-ember-500/40 bg-ember-500/10 px-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ember-200"
+    className="flex items-center justify-between gap-4 border-b border-border bg-surface px-4 py-2"
   >
-    <span className="text-ember-500">●</span>
-    <span>Read-only demo mode</span>
-    <span className="hidden text-ink-300 sm:inline">
-      — chat is live but you cannot send messages or change channels.
-    </span>
-    <button
-      type="button"
-      onClick={onSignIn}
-      className="ml-1 border border-ember-500/60 px-2 py-0.5 text-ember-500 transition-colors hover:bg-ember-500 hover:text-ink-950"
-    >
+    <div className="flex items-center gap-3">
+      <span className="font-mono text-xs uppercase tracking-[0.2em] text-text-muted">
+        Demo mode
+      </span>
+      <span className="hidden text-xs text-text-muted sm:inline">
+        Read-only demo mode — chat is live but you cannot send messages or change channels.
+      </span>
+    </div>
+    <Button type="button" variant="ghost" size="sm" onClick={onSignIn}>
       Sign in with Twitch
-    </button>
+    </Button>
   </div>
 )
