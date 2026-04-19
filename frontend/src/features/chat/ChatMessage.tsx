@@ -47,7 +47,10 @@ function ChatMessageInner({ message }: ChatMessageProps): JSX.Element {
         <BadgeIcon key={`${badge.setId}:${badge.id}`} badge={badge} />
       ))}
       {message.messageType === 'user_intro' ? <IntroBadge /> : null}
-      <span className="font-semibold" style={{ color: message.color || '#a1a1aa' }}>
+      <span
+        className={message.color ? 'font-semibold' : 'font-semibold text-text-muted'}
+        style={message.color ? { color: message.color } : undefined}
+      >
         {message.displayName}
       </span>
       <span className="text-text-muted mr-1">:</span>

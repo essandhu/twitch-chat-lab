@@ -38,14 +38,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (fallback) return fallback(error, this.reset)
 
     return (
-      <div className="border border-ink-700 bg-ink-900/60 p-4 text-sm font-mono">
-        <p className="text-ink-300">
+      <div className="border border-border bg-surface/60 p-4 text-sm font-mono">
+        <p className="text-text-muted">
           {label ?? 'This section'} hit an error. Reload to recover.
         </p>
         <button
           type="button"
           onClick={this.reset}
-          className="text-xs uppercase tracking-[0.2em] text-ember-500 hover:text-ember-400 mt-2"
+          className="text-xs uppercase tracking-[0.2em] text-accent hover:text-accent-hover mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           Retry
         </button>
