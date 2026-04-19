@@ -1,0 +1,88 @@
+name: Update Visual Baselines
+
+# Manually-triggered job that regenerates the Playwright visual-regression
+# PNGs under tests/e2e/__screenshots__/ on a Linux runner (matching CI's
+# rendering environment) and pushes the refreshed baselines back to the
+# branch. Used when font rendering drifts between the baseline-capture
+# environment and CI — see docs/phase-7-review.md for background.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch to refresh baselines on"
+        required: true
+        default: "main"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-visual-baselines-${{ inputs.ref }}
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Regenerate + commit baselines
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          # persist-credentials is true by default — we rely on it to push.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Regenerate visual-regression baselines
+        working-directory: frontend
+        run: npx playwright test visual-regression --update-snapshots --reporter=list
+      - name: Show changed files
+        id: diff
+        run: |
+          git status --porcelain frontend/tests/e2e/__screenshots__ | tee /tmp/baseline-diff.txt
+          if [[ -s /tmp/baseline-diff.txt ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload refreshed baselines as artifact
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines-${{ inputs.ref }}
+          path: frontend/tests/e2e/__screenshots__/
+          retention-days: 14
+      - name: Commit + push refreshed baselines
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/tests/e2e/__screenshots__
+          git commit -m "chore(ci): refresh Playwright visual baselines
+
+          Regenerated on ubuntu-latest via .github/workflows/update-visual-baselines.yml.
+          Ref: ${{ inputs.ref }}"
+          git push origin HEAD:${{ inputs.ref }}
+      - name: Write job summary
+        run: |
+          {
+            echo "## Visual baseline refresh — \`${{ inputs.ref }}\`"
+            echo ""
+            if [[ "${{ steps.diff.outputs.changed }}" == "true" ]]; then
+              echo "**Changed baselines pushed to branch.**"
+              echo ""
+              echo '```'
+              cat /tmp/baseline-diff.txt
+              echo '```'
+            else
+              echo "No baseline drift — \`__screenshots__/\` unchanged."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
