@@ -90,6 +90,7 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
           <div
             role="status"
             aria-live="polite"
+            aria-label={`Connecting to ${slice.displayName}`}
             className="flex h-full items-center justify-center px-4"
           >
             <div className="flex flex-col items-center gap-3 text-text-muted">
@@ -98,7 +99,7 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
                 className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent"
               />
               <span className="font-mono text-[11px] uppercase tracking-[0.2em]">
-                connecting to {slice.displayName}&hellip;
+                connecting&hellip;
               </span>
             </div>
           </div>
