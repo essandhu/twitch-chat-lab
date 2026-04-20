@@ -4,6 +4,7 @@ import { twitchHelixClient } from '../features/auth/authServices'
 import { logger } from '../lib/logger'
 import { StreamSelector, type StreamPick } from '../features/multiStream/StreamSelector'
 import { startCompare } from '../features/multiStream/multiStreamService'
+import { Avatar } from './ui/Avatar'
 import { Button } from './ui/Button'
 
 export function StreamHeader(): JSX.Element | null {
@@ -73,8 +74,28 @@ export function StreamHeader(): JSX.Element | null {
     }
   }
 
+  const broadcasterInitial = (
+    session.broadcasterDisplayName || session.broadcasterLogin
+  )
+    .charAt(0)
+    .toUpperCase()
+
   return (
-    <header className="flex items-center gap-6 border-b border-border bg-surface px-6 py-4">
+    <header className="flex items-center gap-4 border-b border-border bg-surface px-6 py-4">
+      <Avatar.Root className="h-12 w-12 shrink-0">
+        {session.profileImageUrl ? (
+          <Avatar.Image
+            src={session.profileImageUrl}
+            alt={session.broadcasterDisplayName || session.broadcasterLogin}
+          />
+        ) : null}
+        <Avatar.Fallback
+          className="text-base"
+          delayMs={session.profileImageUrl ? 400 : 0}
+        >
+          {broadcasterInitial}
+        </Avatar.Fallback>
+      </Avatar.Root>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           <h1 className="font-display text-lg text-text line-clamp-1">

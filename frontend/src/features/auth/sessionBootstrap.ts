@@ -12,6 +12,7 @@ interface BroadcasterInfo {
   id: string
   login: string
   display_name: string
+  profile_image_url?: string
 }
 
 interface StreamInfo {
@@ -35,4 +36,5 @@ export const buildSession = (
   viewerCount: stream?.viewer_count ?? 0,
   startedAt: stream?.started_at ? new Date(stream.started_at) : new Date(0),
   isConnected: true,
+  profileImageUrl: broadcaster.profile_image_url,
 })

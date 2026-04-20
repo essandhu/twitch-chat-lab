@@ -1,10 +1,36 @@
 import { logger } from '../../lib/logger'
-import { eventSubManager, twitchAuthService } from '../auth/authServices'
+import { eventSubManager, twitchAuthService, twitchHelixClient } from '../auth/authServices'
 import { useChatStore } from '../../store/chatStore'
 import { useMultiStreamStore } from '../../store/multiStreamStore'
 import type { StreamSession } from '../../types/twitch'
 import { ProxyClient } from './ProxyClient'
 import type { StreamPick } from './StreamSelector'
+
+// Fire-and-forget: look up profile images for freshly-added slices so
+// TrackedRow / chat column headers can swap the letter-fallback avatars for
+// real channel pictures. We don't block startCompare on these — the UI
+// renders the fallback while the fetch is in flight.
+const hydrateProfileImages = (logins: string[]): void => {
+  for (const login of logins) {
+    twitchHelixClient
+      .getUser(login)
+      .then((user) => {
+        if (!user?.profile_image_url) return
+        const store = useMultiStreamStore.getState()
+        const slice = store.streams[login]
+        if (!slice) return
+        useMultiStreamStore.setState({
+          streams: {
+            ...store.streams,
+            [login]: { ...slice, profileImageUrl: user.profile_image_url },
+          },
+        })
+      })
+      .catch((err) =>
+        logger.warn('multiStream.profile_image.fetch_failed', { login, error: String(err) }),
+      )
+  }
+}
 
 /**
  * Narrow service module that owns the multi-stream ProxyClient instance and
@@ -62,6 +88,7 @@ export const startCompare = async (args: StartCompareArgs): Promise<void> => {
     login: args.session.broadcasterLogin,
     displayName: args.session.broadcasterDisplayName,
     broadcasterId: args.session.broadcasterId,
+    profileImageUrl: args.session.profileImageUrl,
   })
   // Seed the picks.
   for (const pick of args.picks) {
@@ -71,6 +98,9 @@ export const startCompare = async (args: StartCompareArgs): Promise<void> => {
       broadcasterId: pick.broadcasterId,
     })
   }
+  // Hydrate profile images for any slice missing one. Current session already
+  // carries its image from AuthCallback; picks need a separate /users lookup.
+  hydrateProfileImages(args.picks.map((p) => p.login))
 
   const client = args.clientFactory
     ? args.clientFactory()

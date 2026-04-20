@@ -457,6 +457,7 @@ export interface StreamSession {
   viewerCount: number
   startedAt: Date
   isConnected: boolean
+  profileImageUrl?: string
 }
 
 export interface FilterState {
