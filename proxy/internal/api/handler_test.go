@@ -223,6 +223,66 @@ func TestDeleteSession_Returns204OnKnownID(t *testing.T) {
 	}
 }
 
+// TestDeleteSession_ReleasesIdlePools verifies Fix 2: DELETE /session
+// calls ReleaseIdlePool for each of the session's StreamLogins so the
+// proxy doesn't leave old pools draining while the client tries to open
+// replacements on the same per-user WS transport quota.
+func TestDeleteSession_ReleasesIdlePools(t *testing.T) {
+	_, reg, _ := buildRouterWithSession(t, "", "", nil)
+
+	sess := aggregator.NewSession(context.Background(), "sess-release", "user-42",
+		[]string{"alice", "bob"}, nil)
+	sess.Start()
+	reg.Add(sess)
+
+	var releaseMu sync.Mutex
+	var releases []struct {
+		login  string
+		userID string
+	}
+	deps := api.SessionHandlerDeps{
+		Registry:    reg,
+		HelixBaseURL: "",
+		ValidateURL:  "",
+		ReleaseIdlePool: func(streamLogin, userID string) {
+			releaseMu.Lock()
+			releases = append(releases, struct {
+				login  string
+				userID string
+			}{streamLogin, userID})
+			releaseMu.Unlock()
+		},
+	}
+	// Fresh engine with our observed deps so we can assert the release
+	// call-through without leaking state into the other tests.
+	engine := gin.New()
+	api.RegisterSessionRoutes(engine, deps)
+
+	req := httptest.NewRequest(http.MethodDelete, "/session/sess-release", nil)
+	rr := httptest.NewRecorder()
+	engine.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	releaseMu.Lock()
+	defer releaseMu.Unlock()
+	if len(releases) != 2 {
+		t.Fatalf("expected 2 ReleaseIdlePool calls, got %d: %v", len(releases), releases)
+	}
+	gotLogins := map[string]bool{}
+	for _, rel := range releases {
+		if rel.userID != "user-42" {
+			t.Fatalf("expected userID=user-42, got %q", rel.userID)
+		}
+		gotLogins[rel.login] = true
+	}
+	if !gotLogins["alice"] || !gotLogins["bob"] {
+		t.Fatalf("expected releases for alice+bob, got %v", gotLogins)
+	}
+}
+
 func TestDeleteSession_Returns404OnUnknownID(t *testing.T) {
 	r, _, _ := buildRouterWithSession(t, "", "", nil)
 

@@ -44,6 +44,10 @@ const hydrateProfileImages = (logins: string[]): void => {
 
 let activeClient: ProxyClient | null = null
 let lastEventSubArgs: { broadcasterId: string; userId: string; token: string } | null = null
+// Last channel list we told the proxy about — lets updateCompare compute a
+// minimal diff instead of tearing down and recreating the session. Kept in
+// step with startCompare / successful updateCompare / stopCompare.
+let activeChannels: ChannelListEntry[] = []
 // Simple in-progress guard so rapid-fire clicks can't race two sessions into
 // the registry at the same time.
 let inFlight: Promise<void> | null = null
@@ -109,6 +113,29 @@ const buildChannelList = ({ session, picks }: SeedArgs) => [
   })),
 ]
 
+export interface ChannelListEntry {
+  login: string
+  displayName: string
+  broadcasterId: string
+}
+
+export interface ChannelDiff {
+  add: ChannelListEntry[]
+  remove: string[]
+}
+
+/**
+ * Diff two channel lists so PATCH /session can describe the change as
+ * disjoint add/remove sets. Login is the identity — order is irrelevant.
+ */
+export const diffChannels = (prev: ChannelListEntry[], next: ChannelListEntry[]): ChannelDiff => {
+  const prevLogins = new Set(prev.map((c) => c.login))
+  const nextLogins = new Set(next.map((c) => c.login))
+  const add = next.filter((c) => !prevLogins.has(c.login))
+  const remove = prev.map((c) => c.login).filter((login) => !nextLogins.has(login))
+  return { add, remove }
+}
+
 const reconnectSingleStream = async (): Promise<void> => {
   if (!lastEventSubArgs) return
   try {
@@ -154,15 +181,17 @@ export const startCompare = async (args: StartCompareArgs): Promise<void> => {
     : new ProxyClient({ proxyUrl: getProxyUrl() })
 
   const run = async (): Promise<void> => {
+    const channels = buildChannelList({ session: args.session, picks: args.picks })
     try {
       const { sessionId } = await client.createSession({
-        channels: buildChannelList({ session: args.session, picks: args.picks }),
+        channels,
         userId: args.authedUserId,
         accessToken: token,
       })
 
       await client.connect(sessionId)
       activeClient = client
+      activeChannels = channels
       logger.info('multiStream.activate', {
         channels: [args.session.broadcasterLogin, ...args.picks.map((p) => p.login)],
       })
@@ -170,6 +199,7 @@ export const startCompare = async (args: StartCompareArgs): Promise<void> => {
       logger.error('multiStream.activate.failed', { error: String(err) })
       useMultiStreamStore.getState().reset()
       activeClient = null
+      activeChannels = []
       await reconnectSingleStream()
       throw err
     }
@@ -186,6 +216,19 @@ export const startCompare = async (args: StartCompareArgs): Promise<void> => {
  * Replace the active multi-stream comparison with a new channel set while
  * keeping the user in multi-stream mode throughout. Used when the user
  * reopens the selector from the header to swap channels.
+ *
+ * Fast path (PATCH): if the previous client is still connected, we diff
+ * the old vs new channel list and issue PATCH /session with the
+ * add/remove sets. The proxy reuses the existing session — the WebSocket
+ * stays open, overlapping channels' pools are never torn down, and only
+ * the net-new channels open upstream EventSub transports. This avoids
+ * the transport-cap churn the full-recreate path would cause for a
+ * rapid swap.
+ *
+ * Slow path (recreate): PATCH failure (or missing previous client) falls
+ * through to the classic disconnect-then-createSession flow so the user
+ * always lands in a coherent state, albeit with a few hundred ms of
+ * reconnect latency.
  */
 export const updateCompare = async (args: UpdateCompareArgs): Promise<void> => {
   if (inFlight) {
@@ -210,16 +253,54 @@ export const updateCompare = async (args: UpdateCompareArgs): Promise<void> => {
     token,
   }
 
-  const previousClient = activeClient
-  activeClient = null
-
-  const client = args.clientFactory
-    ? args.clientFactory()
-    : new ProxyClient({ proxyUrl: getProxyUrl() })
+  const nextChannels = buildChannelList({ session: args.session, picks: args.picks })
 
   const run = async (): Promise<void> => {
-    // Tear down the old proxy session first so the server can drop its
-    // subscriptions before we ask it for new ones on the same token.
+    // --- Fast path: PATCH the live session in place.
+    const currentClient = activeClient
+    const currentSessionId = currentClient?.getSessionId() ?? null
+    if (currentClient && currentSessionId && activeChannels.length > 0) {
+      const diff = diffChannels(activeChannels, nextChannels)
+      if (diff.add.length === 0 && diff.remove.length === 0) {
+        // Nothing to do — just refresh the store so display-name
+        // changes (e.g., re-capitalizations) still land.
+        seedStore({ session: args.session, picks: args.picks })
+        useMultiStreamStore.getState().setActive(true)
+        activeChannels = nextChannels
+        logger.info('multiStream.update.noop')
+        return
+      }
+      try {
+        await currentClient.patchSession({
+          sessionId: currentSessionId,
+          add: diff.add,
+          remove: diff.remove,
+          userId: args.authedUserId,
+          accessToken: token,
+        })
+        seedStore({ session: args.session, picks: args.picks })
+        useMultiStreamStore.getState().setActive(true)
+        activeChannels = nextChannels
+        logger.info('multiStream.update.patched', {
+          added: diff.add.map((c) => c.login),
+          removed: diff.remove,
+        })
+        return
+      } catch (err) {
+        logger.warn('multiStream.update.patch_failed_fallback', { error: String(err) })
+        // Fall through to the recreate path below.
+      }
+    }
+
+    // --- Slow path: full recreate.
+    const previousClient = activeClient
+    activeClient = null
+    activeChannels = []
+
+    const client = args.clientFactory
+      ? args.clientFactory()
+      : new ProxyClient({ proxyUrl: getProxyUrl() })
+
     if (previousClient) {
       try {
         await previousClient.disconnect()
@@ -228,20 +309,19 @@ export const updateCompare = async (args: UpdateCompareArgs): Promise<void> => {
       }
     }
 
-    // Re-seed slices with the new channel set. setActive stays true so the
-    // layout never flashes back to single-stream mode.
     seedStore({ session: args.session, picks: args.picks })
     useMultiStreamStore.getState().setActive(true)
 
     try {
       const { sessionId } = await client.createSession({
-        channels: buildChannelList({ session: args.session, picks: args.picks }),
+        channels: nextChannels,
         userId: args.authedUserId,
         accessToken: token,
       })
 
       await client.connect(sessionId)
       activeClient = client
+      activeChannels = nextChannels
       logger.info('multiStream.update', {
         channels: [args.session.broadcasterLogin, ...args.picks.map((p) => p.login)],
       })
@@ -249,6 +329,7 @@ export const updateCompare = async (args: UpdateCompareArgs): Promise<void> => {
       logger.error('multiStream.update.failed', { error: String(err) })
       useMultiStreamStore.getState().reset()
       activeClient = null
+      activeChannels = []
       await reconnectSingleStream()
       throw err
     }
@@ -269,6 +350,7 @@ export const stopCompare = async (): Promise<void> => {
 
   const client = activeClient
   activeClient = null
+  activeChannels = []
 
   if (client) {
     try {
@@ -296,5 +378,6 @@ export const stopCompare = async (): Promise<void> => {
 export const __resetMultiStreamServiceForTests = (): void => {
   activeClient = null
   lastEventSubArgs = null
+  activeChannels = []
   inFlight = null
 }

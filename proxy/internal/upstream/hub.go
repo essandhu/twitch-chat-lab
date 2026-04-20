@@ -278,6 +278,35 @@ func (h *Hub) removePool(p *pool) {
 	}
 }
 
+// ReleaseIdlePool tears down the pool for (streamLogin, userID) NOW if it
+// has no active subscribers, skipping the drain grace. No-op if the pool
+// doesn't exist or if another subscriber is still attached — drain grace is
+// for the passive-close case (tab reload with no DELETE); explicit teardown
+// on DELETE should not wait.
+//
+// Safe to call concurrently with Subscribe: if a subscriber joined between
+// refcount hitting zero and this call, the len check keeps the pool alive.
+func (h *Hub) ReleaseIdlePool(streamLogin, userID string) {
+	key := poolKey{StreamLogin: streamLogin, UserID: userID}
+	h.mu.Lock()
+	p, ok := h.pools[key]
+	h.mu.Unlock()
+	if !ok {
+		return
+	}
+	p.mu.Lock()
+	if p.tornDown || len(p.subscribers) > 0 {
+		p.mu.Unlock()
+		return
+	}
+	if p.drainTimer != nil {
+		p.drainTimer.Stop()
+		p.drainTimer = nil
+	}
+	p.mu.Unlock()
+	p.onDrainExpire()
+}
+
 // pool holds exactly one upstream EventSub connection along with the set
 // of downstream subscribers fanning off it.
 type pool struct {

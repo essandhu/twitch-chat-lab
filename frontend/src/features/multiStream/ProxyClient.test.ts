@@ -524,4 +524,85 @@ describe('ProxyClient', () => {
       }
     }
   })
+
+  it('patchSession PATCHes add/remove/user/token and returns the updated channel list', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(JSON.stringify({ session_id: 'sess-patch', channels: ['alice', 'carol'] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ) as unknown as typeof fetch
+
+    const client = new ProxyClient({
+      proxyUrl: 'http://proxy.test',
+      fetchImpl,
+    })
+
+    const result = await client.patchSession({
+      sessionId: 'sess-patch',
+      add: [{ login: 'carol', displayName: 'Carol', broadcasterId: 'b_carol' }],
+      remove: ['bob'],
+      userId: 'u1',
+      accessToken: 'tok',
+    })
+
+    expect(result).toEqual({ sessionId: 'sess-patch', channels: ['alice', 'carol'] })
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    const call = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]!
+    expect(call[0]).toBe('http://proxy.test/session/sess-patch')
+    const init = call[1] as RequestInit
+    expect(init.method).toBe('PATCH')
+    expect(JSON.parse(init.body as string)).toEqual({
+      add: ['carol'],
+      remove: ['bob'],
+      user_id: 'u1',
+      access_token: 'tok',
+    })
+  })
+
+  it('patchSession throws ProxyError on 4xx/5xx so callers can fall back to recreate', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response('bad gateway', { status: 502 }),
+    ) as unknown as typeof fetch
+
+    const client = new ProxyClient({
+      proxyUrl: 'http://proxy.test',
+      fetchImpl,
+    })
+
+    await expect(
+      client.patchSession({
+        sessionId: 'sess-x',
+        add: [],
+        remove: ['bob'],
+        userId: 'u1',
+        accessToken: 'tok',
+      }),
+    ).rejects.toBeInstanceOf(ProxyError)
+  })
+
+  it('patchSession surfaces 404 (session_not_found) as ProxyError with the status preserved', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response('{"error":"session_not_found"}', { status: 404 }),
+    ) as unknown as typeof fetch
+
+    const client = new ProxyClient({
+      proxyUrl: 'http://proxy.test',
+      fetchImpl,
+    })
+
+    try {
+      await client.patchSession({
+        sessionId: 'sess-missing',
+        add: [{ login: 'carol', displayName: 'Carol', broadcasterId: 'b_carol' }],
+        remove: [],
+        userId: 'u1',
+        accessToken: 'tok',
+      })
+      throw new Error('expected throw')
+    } catch (err) {
+      expect(err).toBeInstanceOf(ProxyError)
+      expect((err as ProxyError).status).toBe(404)
+    }
+  })
 })

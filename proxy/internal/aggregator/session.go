@@ -163,6 +163,75 @@ func (s *Session) AttachConn(streamLogin string, c Conn) {
 	s.conns = append(s.conns, attachedConn{streamLogin: streamLogin, conn: c})
 }
 
+// AttachConnLive registers a Conn and spawns its runner on an
+// already-started session. Used by PATCH /session to add channels without
+// tearing the whole session down. Returns false if the session has
+// stopped — the caller is expected to close the conn itself in that case.
+//
+// StreamLogins is updated so the live list of channels the session is
+// serving remains accurate; PATCH depends on this for subsequent
+// DetachConn lookups and for the DELETE handler's ReleaseIdlePool loop.
+func (s *Session) AttachConnLive(streamLogin string, c Conn) bool {
+	s.mu.Lock()
+	if s.stopped {
+		s.mu.Unlock()
+		return false
+	}
+	s.conns = append(s.conns, attachedConn{streamLogin: streamLogin, conn: c})
+	s.StreamLogins = append(s.StreamLogins, streamLogin)
+	ac := s.conns[len(s.conns)-1]
+	// If Start hasn't fired yet, defer runner launch to Start — it reads
+	// s.conns under the lock and will spawn runConn for us.
+	if !s.started {
+		s.mu.Unlock()
+		return true
+	}
+	s.wg.Add(1)
+	s.mu.Unlock()
+	go s.runConn(ac)
+	return true
+}
+
+// DetachConn removes the conn associated with streamLogin, closes it, and
+// drops streamLogin from StreamLogins. Safe post-Start — the runner
+// goroutine will exit when Conn.Close unblocks Conn.Run, and the
+// upstream_lost envelope emitted by runConn is suppressed because the
+// streamLogin is no longer in s.conns.
+//
+// Returns true if a matching conn was found and detached. No-op (false)
+// if the streamLogin isn't attached or the session has already stopped.
+// Close is invoked OUTSIDE the lock to mirror Registry.Remove's pattern.
+func (s *Session) DetachConn(streamLogin string) bool {
+	s.mu.Lock()
+	if s.stopped {
+		s.mu.Unlock()
+		return false
+	}
+	idx := -1
+	for i, ac := range s.conns {
+		if ac.streamLogin == streamLogin {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		s.mu.Unlock()
+		return false
+	}
+	victim := s.conns[idx]
+	s.conns = append(s.conns[:idx], s.conns[idx+1:]...)
+	for i, l := range s.StreamLogins {
+		if l == streamLogin {
+			s.StreamLogins = append(s.StreamLogins[:i], s.StreamLogins[i+1:]...)
+			break
+		}
+	}
+	s.mu.Unlock()
+
+	_ = victim.conn.Close()
+	return true
+}
+
 // Start launches one runner goroutine per attached Conn. Each runner
 // executes Conn.Run under the session context and emits an upstream_lost
 // envelope to FrameOut when Run returns (error or nil).
@@ -201,11 +270,21 @@ func (s *Session) runConn(ac attachedConn) {
 
 	// Skip upstream_lost emission if Stop has already been called — the
 	// downstream will have been closed and we'd be writing into a
-	// channel that's about to be drained & closed by Stop.
+	// channel that's about to be drained & closed by Stop. Also skip if
+	// this streamLogin has been detached via DetachConn (PATCH remove):
+	// the runner exit is expected and the client does not want an
+	// upstream_lost envelope for a channel it deliberately dropped.
 	s.mu.Lock()
 	stopped := s.stopped
+	stillAttached := false
+	for _, a := range s.conns {
+		if a.streamLogin == ac.streamLogin {
+			stillAttached = true
+			break
+		}
+	}
 	s.mu.Unlock()
-	if stopped {
+	if stopped || !stillAttached {
 		return
 	}
 
