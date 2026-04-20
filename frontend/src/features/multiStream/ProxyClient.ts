@@ -37,6 +37,19 @@ export interface CreateSessionResult {
   sessionId: string
 }
 
+export interface PatchSessionArgs {
+  sessionId: string
+  add: ProxyChannel[]
+  remove: string[]
+  userId: string
+  accessToken: string
+}
+
+export interface PatchSessionResult {
+  sessionId: string
+  channels: string[]
+}
+
 export class ProxyError extends Error {
   readonly status: number
   readonly body: string
@@ -112,6 +125,41 @@ export class ProxyClient {
     })
 
     return { sessionId: parsed.session_id }
+  }
+
+  async patchSession(args: PatchSessionArgs): Promise<PatchSessionResult> {
+    const url = `${this.proxyUrl}/session/${args.sessionId}`
+    const body = JSON.stringify({
+      add: args.add.map((c) => c.login),
+      remove: args.remove,
+      user_id: args.userId,
+      access_token: args.accessToken,
+    })
+
+    const response = await this.fetchImpl(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    })
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '')
+      this.logger.warn('proxy.session.patch_failed', { status: response.status, body: text })
+      throw new ProxyError(response.status, text)
+    }
+
+    const parsed = (await response.json()) as { session_id: string; channels: string[] }
+    this.logger.info('proxy.session.patched', {
+      sessionId: parsed.session_id,
+      added: args.add.map((c) => c.login),
+      removed: args.remove,
+      channels: parsed.channels,
+    })
+    return { sessionId: parsed.session_id, channels: parsed.channels }
+  }
+
+  getSessionId(): string | null {
+    return this.sessionId
   }
 
   connect(sessionId: string): Promise<void> {

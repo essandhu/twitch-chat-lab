@@ -432,6 +432,134 @@ func TestHub_Subscribe_OpenFailureRetriesCleanly(t *testing.T) {
 	}
 }
 
+// Test: ReleaseIdlePool on a pool whose last subscriber just left
+// short-circuits the drain grace — upstream is unsubscribed immediately
+// and the pool is removed from the hub map.
+func TestHub_ReleaseIdlePool_ShortCircuitsDrain(t *testing.T) {
+	f := newHubFixture(t)
+	defer f.hub.Shutdown()
+
+	p := baseParams("alice", "u1")
+	p.OnFrame = func([]byte) {}
+
+	sub, err := f.hub.Subscribe(context.Background(), p)
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	_ = sub.Close()
+
+	tim := f.latestTimer()
+	if tim == nil {
+		t.Fatalf("expected drain timer after Close")
+	}
+
+	// Short-circuit the grace.
+	f.hub.ReleaseIdlePool("alice", "u1")
+
+	if !waitCond(1*time.Second, func() bool { return f.unsubCount.Load() == 1 }) {
+		t.Fatalf("unsubscribe never called after release (got %d)", f.unsubCount.Load())
+	}
+	if !waitCond(1*time.Second, func() bool {
+		f.hub.mu.Lock()
+		defer f.hub.mu.Unlock()
+		return len(f.hub.pools) == 0
+	}) {
+		t.Fatalf("pool still registered after release")
+	}
+	// Firing the (now-stopped) timer must be a no-op — previously cancelled.
+	tim.Fire()
+	if f.unsubCount.Load() != 1 {
+		t.Fatalf("double unsubscribe: timer fired after release (got %d)", f.unsubCount.Load())
+	}
+}
+
+// Test: ReleaseIdlePool is a safe no-op when the pool still has active
+// subscribers (e.g., another session joined mid-DELETE). No drain timer
+// is touched and no unsubscribe fires.
+func TestHub_ReleaseIdlePool_NoopWhenActive(t *testing.T) {
+	f := newHubFixture(t)
+	defer f.hub.Shutdown()
+
+	p1 := baseParams("alice", "u1")
+	p1.OnFrame = func([]byte) {}
+	p2 := baseParams("alice", "u1")
+	p2.OnFrame = func([]byte) {}
+
+	s1, err := f.hub.Subscribe(context.Background(), p1)
+	if err != nil {
+		t.Fatalf("subscribe 1: %v", err)
+	}
+	defer s1.Close()
+	s2, err := f.hub.Subscribe(context.Background(), p2)
+	if err != nil {
+		t.Fatalf("subscribe 2: %v", err)
+	}
+	defer s2.Close()
+
+	f.hub.ReleaseIdlePool("alice", "u1")
+
+	if f.unsubCount.Load() != 0 {
+		t.Fatalf("expected 0 unsubscribes (pool has active subscribers), got %d", f.unsubCount.Load())
+	}
+	f.hub.mu.Lock()
+	pools := len(f.hub.pools)
+	f.hub.mu.Unlock()
+	if pools != 1 {
+		t.Fatalf("expected pool to still exist, got %d", pools)
+	}
+}
+
+// Test: ReleaseIdlePool on an unknown key is a no-op. Guards the path
+// where a DELETE arrives for a session whose pools were already reaped
+// by another subscriber's teardown.
+func TestHub_ReleaseIdlePool_NoopWhenMissing(t *testing.T) {
+	f := newHubFixture(t)
+	defer f.hub.Shutdown()
+
+	// Should not panic, should not call unsubscribe.
+	f.hub.ReleaseIdlePool("nonexistent", "nouser")
+
+	if f.unsubCount.Load() != 0 {
+		t.Fatalf("expected 0 unsubscribes for missing key, got %d", f.unsubCount.Load())
+	}
+}
+
+// Test: after ReleaseIdlePool tears down a pool, a fresh Subscribe for
+// the same key opens a new upstream connection (the torn-down pool was
+// removed from the hub map).
+func TestHub_ReleaseIdlePool_AllowsReopen(t *testing.T) {
+	f := newHubFixture(t)
+	defer f.hub.Shutdown()
+
+	p := baseParams("alice", "u1")
+	p.OnFrame = func([]byte) {}
+
+	sub, err := f.hub.Subscribe(context.Background(), p)
+	if err != nil {
+		t.Fatalf("subscribe 1: %v", err)
+	}
+	_ = sub.Close()
+	f.hub.ReleaseIdlePool("alice", "u1")
+
+	if !waitCond(1*time.Second, func() bool {
+		f.hub.mu.Lock()
+		defer f.hub.mu.Unlock()
+		return len(f.hub.pools) == 0
+	}) {
+		t.Fatalf("pool not removed after release")
+	}
+
+	sub2, err := f.hub.Subscribe(context.Background(), p)
+	if err != nil {
+		t.Fatalf("subscribe 2: %v", err)
+	}
+	defer sub2.Close()
+
+	if f.openCount.Load() != 2 {
+		t.Fatalf("expected second open after release+resubscribe, got %d", f.openCount.Load())
+	}
+}
+
 // Test: concurrent Subscribe calls for the same key serialize on pool init
 // — exactly one open + register regardless of caller count.
 func TestHub_Subscribe_ConcurrentSameKeyOpensOnce(t *testing.T) {

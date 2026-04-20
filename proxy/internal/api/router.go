@@ -77,7 +77,7 @@ func corsMiddleware(allowed []string) gin.HandlerFunc {
 		allowedSet[o] = struct{}{}
 	}
 
-	allowMethods := strings.Join([]string{http.MethodGet, http.MethodPost, http.MethodDelete, http.MethodOptions}, ", ")
+	allowMethods := strings.Join([]string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodDelete, http.MethodOptions}, ", ")
 	allowHeaders := strings.Join([]string{"Content-Type", "Authorization", "Upgrade", "Connection", "Sec-WebSocket-Key", "Sec-WebSocket-Version", "Sec-WebSocket-Protocol", "Sec-WebSocket-Extensions"}, ", ")
 
 	return func(c *gin.Context) {
