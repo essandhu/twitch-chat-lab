@@ -9,14 +9,6 @@ export type ChatDockProps = {
    * Clamped into [MIN_WIDTH, MAX_WIDTH]. Defaults to 340.
    */
   defaultWidth?: number
-  /**
-   * External auto-collapse signal (e.g. multi-stream mode takes over the main
-   * pane and makes the dock's chat redundant). Transitions to true collapse
-   * the dock; the persisted collapse preference in localStorage is never
-   * written from this prop, so exiting leaves the dock in whatever state the
-   * user last drove it to.
-   */
-  forceCollapsed?: boolean
 }
 
 const WIDTH_KEY = 'tcl.chat-dock.width'
@@ -110,25 +102,13 @@ export const ChatDock = ({
   children,
   className,
   defaultWidth = DEFAULT_WIDTH,
-  forceCollapsed = false,
 }: ChatDockProps) => {
   const [width, setWidth] = useState<number>(() => readInitialWidth(defaultWidth))
-  const [collapsed, setCollapsed] = useState<boolean>(
-    () => forceCollapsed || readInitialCollapsed(),
-  )
+  const [collapsed, setCollapsed] = useState<boolean>(() => readInitialCollapsed())
   const widthRef = useRef(width)
   widthRef.current = width
 
   const { onPointerDown } = useResizeDrag(widthRef, setWidth)
-
-  // Auto-collapse on the false→true edge of forceCollapsed. We deliberately
-  // do NOT restore on the true→false edge — if the user manually expanded
-  // the dock during multi-stream they'd expect that to stick.
-  const prevForceRef = useRef(forceCollapsed)
-  useEffect(() => {
-    if (forceCollapsed && !prevForceRef.current) setCollapsed(true)
-    prevForceRef.current = forceCollapsed
-  }, [forceCollapsed])
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => {

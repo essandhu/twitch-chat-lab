@@ -124,7 +124,14 @@ export class EventSubManager {
       clearInterval(this.tickTimer)
       this.tickTimer = null
     }
+    // Clear every piece of per-session state so a subsequent connect() starts
+    // from a blank slate. Keeping stale args/correlationId around meant a
+    // disconnect → connect cycle (e.g. exiting multi-stream) could race a
+    // late welcome frame from the old socket against the new session's
+    // registration and silently drop subscriptions.
     this.sessionId = null
+    this.correlationId = null
+    this.args = null
   }
 
   private openSocket(url: string): Promise<void> {
