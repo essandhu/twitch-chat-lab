@@ -6,24 +6,31 @@ type RootProps = React.ComponentPropsWithoutRef<typeof RadixAvatar.Root>
 type ImageProps = React.ComponentPropsWithoutRef<typeof RadixAvatar.Image>
 type FallbackProps = React.ComponentPropsWithoutRef<typeof RadixAvatar.Fallback>
 
-// Root wears a pulsing placeholder background that is only visible in the
-// narrow window where Radix has mounted the Image but the network hasn't
-// produced a loaded status yet. Once Image resolves, it covers the Root;
-// once Fallback resolves (error / no Image child), its own solid bg covers
-// the Root. So this shimmer shows for loading real URLs only — letter-only
-// avatars never flash.
+// The shimmer is a negative-z-index sibling of Image/Fallback so the pulse
+// animates only the shimmer layer — not Root itself. A pulse applied to Root
+// would cascade its opacity animation down into every child (including a
+// loaded Image), which previously made the profile picture keep pulsing.
+// `isolate` keeps the negative z-index contained within Root's stacking
+// context. Once Image loads or Fallback mounts, their opaque backgrounds
+// cover the shimmer — it never shows through for letter-only avatars.
 const AvatarRoot = React.forwardRef<
   React.ElementRef<typeof RadixAvatar.Root>,
   RootProps
->(({ className, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <RadixAvatar.Root
     ref={ref}
     className={cn(
-      'h-8 w-8 rounded-full overflow-hidden inline-block bg-surface-hover motion-safe:animate-pulse',
+      'relative isolate h-8 w-8 rounded-full overflow-hidden inline-block',
       className,
     )}
     {...props}
-  />
+  >
+    <span
+      aria-hidden="true"
+      className="absolute inset-0 -z-10 bg-surface-hover motion-safe:animate-pulse"
+    />
+    {children}
+  </RadixAvatar.Root>
 ))
 AvatarRoot.displayName = 'Avatar.Root'
 
