@@ -1,9 +1,10 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/cn'
 import { Avatar } from '../ui/Avatar'
 import { Tooltip } from '../ui/Tooltip'
 import { useIsBelow } from '../../hooks/useIsBelow'
+import { useChatStore } from '../../store/chatStore'
 import { useMultiStreamStore } from '../../store/multiStreamStore'
 
 const STORAGE_KEY = 'tcl.rail.collapsed'
@@ -105,28 +106,29 @@ const NavButton = ({ label, icon, collapsed, active, disabled, disabledTooltip, 
 
 type TrackedRowProps = {
   displayName: string
+  profileImageUrl?: string
   collapsed: boolean
 }
 
-const TrackedRow = ({ displayName, collapsed }: TrackedRowProps) => {
+const TrackedRow = ({ displayName, profileImageUrl, collapsed }: TrackedRowProps) => {
   const letter = displayName.charAt(0).toUpperCase()
   const row = (
     <button
       type="button"
       className={cn(
-        'flex items-center gap-3 h-12 px-3 w-full text-left rounded-md transition-colors',
+        'flex items-center gap-3 h-10 px-3 w-full text-left rounded-md transition-colors',
         'hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
         collapsed && 'justify-center',
       )}
     >
       <Avatar.Root className="h-8 w-8 shrink-0">
-        <Avatar.Fallback>{letter}</Avatar.Fallback>
+        {profileImageUrl ? (
+          <Avatar.Image src={profileImageUrl} alt={displayName} />
+        ) : null}
+        <Avatar.Fallback delayMs={profileImageUrl ? 400 : 0}>{letter}</Avatar.Fallback>
       </Avatar.Root>
       {!collapsed && (
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm text-text">{displayName}</span>
-          <span className="truncate text-xs text-text-muted">&nbsp;</span>
-        </span>
+        <span className="truncate text-sm text-text">{displayName}</span>
       )}
     </button>
   )
@@ -145,6 +147,7 @@ export const LeftRail = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const streams = useMultiStreamStore((s) => s.streams)
+  const session = useChatStore((s) => s.session)
   const shouldAutoCollapse = useIsBelow(1280)
   const [collapsed, setCollapsed] = useState<boolean>(() =>
     readInitialCollapsed(shouldAutoCollapse),
@@ -176,7 +179,24 @@ export const LeftRail = () => {
   }, [])
 
   const isHomeActive = location.pathname === '/'
-  const trackedEntries = Object.values(streams)
+  const trackedEntries = useMemo(() => {
+    const fromMulti = Object.values(streams).map((s) => ({
+      login: s.login,
+      displayName: s.displayName,
+      profileImageUrl: s.profileImageUrl,
+    }))
+    if (fromMulti.length > 0) return fromMulti
+    if (session) {
+      return [
+        {
+          login: session.broadcasterLogin,
+          displayName: session.broadcasterDisplayName || session.broadcasterLogin,
+          profileImageUrl: session.profileImageUrl,
+        },
+      ]
+    }
+    return []
+  }, [streams, session])
 
   return (
     <div
@@ -219,7 +239,12 @@ export const LeftRail = () => {
         )}
         <div className="flex flex-col gap-0.5 p-2">
           {trackedEntries.map((s) => (
-            <TrackedRow key={s.login} displayName={s.displayName} collapsed={collapsed} />
+            <TrackedRow
+              key={s.login}
+              displayName={s.displayName}
+              profileImageUrl={s.profileImageUrl}
+              collapsed={collapsed}
+            />
           ))}
         </div>
       </div>

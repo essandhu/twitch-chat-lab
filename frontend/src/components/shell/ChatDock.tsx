@@ -195,7 +195,33 @@ export const ChatDock = ({
         onPointerDown={onPointerDown}
         className="absolute left-0 top-0 h-full w-1 cursor-col-resize before:absolute before:inset-y-0 before:-left-1 before:w-2 before:content-['']"
       />
-      {children}
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border pl-3 pr-1">
+        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-text-muted">
+          Chat
+        </span>
+        <button
+          type="button"
+          aria-label="Collapse chat (Ctrl+Shift+C)"
+          title="Collapse chat (Ctrl+Shift+C)"
+          onClick={toggleCollapsed}
+          className="flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6 4l4 4-4 4" />
+          </svg>
+        </button>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
     </div>
   )
 }

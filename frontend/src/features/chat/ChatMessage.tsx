@@ -10,7 +10,7 @@ interface ChatMessageProps {
   message: ChatMessageData
 }
 
-const BASE_CLASS = 'flex items-baseline gap-1 px-3 py-0.5 text-sm leading-tight'
+const BASE_CLASS = 'block px-3 py-0.5 text-sm leading-tight break-words'
 
 const variantClass = (messageType: string, isHighlighted: boolean): string => {
   if (isHighlighted) return 'bg-surface-hover/40'
@@ -22,7 +22,7 @@ const variantClass = (messageType: string, isHighlighted: boolean): string => {
 
 function IntroBadge() {
   return (
-    <span className="px-1 py-0.5 text-[10px] font-semibold rounded bg-accent/20 text-accent">
+    <span className="inline-block mr-1 px-1 py-0.5 text-[10px] font-semibold rounded bg-accent/20 text-accent align-middle">
       👋 intro
     </span>
   )
@@ -39,7 +39,7 @@ function relativeTime(date: Date): string {
 function FirstTimerTag({ timestamp }: { timestamp: Date }) {
   return (
     <span
-      className="ml-auto shrink-0 pl-2 font-mono text-[10px] tracking-wide text-accent/70"
+      className="float-right ml-2 pl-2 font-mono text-[10px] tracking-wide text-accent/70"
       title={`First time this session · ${timestamp.toLocaleTimeString()}`}
     >
       {relativeTime(timestamp)}
@@ -62,6 +62,7 @@ function ChatMessageInner({ message }: ChatMessageProps): JSX.Element {
 
   const body = (
     <>
+      {message.isFirstInSession ? <FirstTimerTag timestamp={message.timestamp} /> : null}
       {message.badges.map((badge) => (
         <BadgeIcon key={`${badge.setId}:${badge.id}`} badge={badge} />
       ))}
@@ -72,10 +73,9 @@ function ChatMessageInner({ message }: ChatMessageProps): JSX.Element {
       >
         {message.displayName}
       </span>
-      <span className="text-text-muted mr-1">:</span>
+      <span className="text-text-muted">: </span>
       {message.cheer ? <CheerPill bits={message.cheer.bits} /> : null}
       <EmoteText fragments={message.fragments} cheerTierColor={cheerColor} />
-      {message.isFirstInSession ? <FirstTimerTag timestamp={message.timestamp} /> : null}
     </>
   )
 
@@ -85,10 +85,8 @@ function ChatMessageInner({ message }: ChatMessageProps): JSX.Element {
 
   return (
     <div className={className}>
-      <div className="w-full">
-        <ReplyHeader reply={message.reply} onScrollToParent={onScrollToParent} />
-        <div className="flex items-baseline gap-1">{body}</div>
-      </div>
+      <ReplyHeader reply={message.reply} onScrollToParent={onScrollToParent} />
+      {body}
     </div>
   )
 }

@@ -33,8 +33,6 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
   // flipped us to 'ready' yet (e.g., annotations-first frames). Users don't
   // want to see a spinner sitting above already-visible chat.
   const showConnectingPlaceholder = isConnecting && slice.messages.length === 0
-  // StreamSlice currently carries no thumbnail URL from Helix — fall back to
-  // the displayName initial (no Helix fetch added per P7-16 scope).
   const initial = slice.displayName.charAt(0).toUpperCase()
 
   const statusDotClass = isDegraded
@@ -48,7 +46,12 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
       <Card.Header className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <Avatar.Root className="h-6 w-6 flex-shrink-0">
-            <Avatar.Fallback>{initial}</Avatar.Fallback>
+            {slice.profileImageUrl ? (
+              <Avatar.Image src={slice.profileImageUrl} alt={slice.displayName} />
+            ) : null}
+            <Avatar.Fallback delayMs={slice.profileImageUrl ? 400 : 0}>
+              {initial}
+            </Avatar.Fallback>
           </Avatar.Root>
           <span
             aria-hidden="true"

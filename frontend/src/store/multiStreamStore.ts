@@ -17,6 +17,7 @@ export interface StreamSlice {
   login: string
   displayName: string
   broadcasterId: string
+  profileImageUrl?: string
   messages: ChatMessage[]
   seenUserIds: Set<string>
   firstTimers: FirstTimerEntry[]
@@ -33,7 +34,10 @@ export interface MultiStreamStoreState {
   order: string[]
   isActive: boolean
 
-  addStream: (init: Pick<StreamSlice, 'login' | 'displayName' | 'broadcasterId'>) => void
+  addStream: (
+    init: Pick<StreamSlice, 'login' | 'displayName' | 'broadcasterId'> &
+      Partial<Pick<StreamSlice, 'profileImageUrl'>>,
+  ) => void
   removeStream: (login: string) => void
   addMessage: (login: string, raw: ChannelChatMessageEvent) => void
   addAnnotation: (login: string, annotation: EventAnnotation) => void
@@ -47,11 +51,13 @@ export interface MultiStreamStoreState {
 }
 
 const createEmptySlice = (
-  init: Pick<StreamSlice, 'login' | 'displayName' | 'broadcasterId'>,
+  init: Pick<StreamSlice, 'login' | 'displayName' | 'broadcasterId'> &
+    Partial<Pick<StreamSlice, 'profileImageUrl'>>,
 ): StreamSlice => ({
   login: init.login,
   displayName: init.displayName,
   broadcasterId: init.broadcasterId,
+  profileImageUrl: init.profileImageUrl,
   messages: [],
   seenUserIds: new Set<string>(),
   firstTimers: [],
