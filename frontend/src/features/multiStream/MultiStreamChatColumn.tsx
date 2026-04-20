@@ -13,12 +13,12 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
   const slice = useStreamSlice(streamLogin)
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
-  // Re-show banner on fresh transition into degraded state.
+  // Re-show banner on fresh transition out of degraded state.
   useEffect(() => {
-    if (slice?.isDegraded === false) {
+    if (slice && slice.connectionState !== 'degraded') {
       setBannerDismissed(false)
     }
-  }, [slice?.isDegraded])
+  }, [slice?.connectionState])
 
   if (!slice) return null
 
@@ -26,10 +26,22 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
     useMultiStreamStore.getState().removeStream(streamLogin)
   }
 
-  const showBanner = slice.isDegraded && !bannerDismissed
+  const isConnecting = slice.connectionState === 'connecting'
+  const isDegraded = slice.connectionState === 'degraded'
+  const showBanner = isDegraded && !bannerDismissed
+  // Hide the spinner once any message has landed, even if the store hasn't
+  // flipped us to 'ready' yet (e.g., annotations-first frames). Users don't
+  // want to see a spinner sitting above already-visible chat.
+  const showConnectingPlaceholder = isConnecting && slice.messages.length === 0
   // StreamSlice currently carries no thumbnail URL from Helix — fall back to
   // the displayName initial (no Helix fetch added per P7-16 scope).
   const initial = slice.displayName.charAt(0).toUpperCase()
+
+  const statusDotClass = isDegraded
+    ? 'bg-surface-hover'
+    : isConnecting
+    ? 'bg-warning animate-pulse'
+    : 'bg-success'
 
   return (
     <Card className="relative flex h-full min-h-0 flex-col rounded-none">
@@ -40,9 +52,7 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
           </Avatar.Root>
           <span
             aria-hidden="true"
-            className={`inline-block h-2 w-2 rounded-full flex-shrink-0 ${
-              slice.isDegraded ? 'bg-surface-hover' : 'bg-success'
-            }`}
+            className={`inline-block h-2 w-2 rounded-full flex-shrink-0 ${statusDotClass}`}
           />
           <span className="font-semibold text-sm text-text truncate">
             {slice.displayName}
@@ -76,7 +86,26 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
       )}
 
       <div className="flex-1 min-h-0">
-        <ChatList messagesOverride={slice.messages} />
+        {showConnectingPlaceholder ? (
+          <div
+            role="status"
+            aria-live="polite"
+            aria-label={`Connecting to ${slice.displayName}`}
+            className="flex h-full items-center justify-center px-4"
+          >
+            <div className="flex flex-col items-center gap-3 text-text-muted">
+              <span
+                aria-hidden="true"
+                className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent"
+              />
+              <span className="font-mono text-[11px] uppercase tracking-[0.2em]">
+                connecting&hellip;
+              </span>
+            </div>
+          </div>
+        ) : (
+          <ChatList messagesOverride={slice.messages} />
+        )}
       </div>
     </Card>
   )
