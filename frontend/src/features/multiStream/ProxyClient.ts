@@ -236,7 +236,9 @@ export class ProxyClient {
   private startTick(): void {
     if (this.tickTimer) clearInterval(this.tickTimer)
     this.tickTimer = setInterval(() => {
-      useMultiStreamStore.getState().tickAll()
+      const store = useMultiStreamStore.getState()
+      store.tickAll()
+      store.tickCorrelation()
     }, TICK_INTERVAL_MS)
   }
 

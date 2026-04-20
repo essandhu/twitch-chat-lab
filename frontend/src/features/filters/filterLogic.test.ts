@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Badge, ChatMessage, FilterState } from '../../types/twitch'
-import { applyFilters, countActiveFilters } from './filterLogic'
+import { applyFilters, countActiveFilters, desugarToggles } from './filterLogic'
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -278,5 +278,116 @@ describe('countActiveFilters', () => {
         hypeModeOnly: true,
       }),
     ).toBe(4)
+  })
+
+  it('counts a valid query as an active filter', () => {
+    expect(countActiveFilters({ ...inactiveState, query: 'role:sub', queryError: null })).toBe(1)
+  })
+
+  it('does not count an invalid query as active', () => {
+    expect(
+      countActiveFilters({ ...inactiveState, query: 'bad)', queryError: 'unbalanced parenthesis' }),
+    ).toBe(0)
+  })
+})
+
+// -----------------------------------------------------------------------------
+// desugarToggles (Phase 8)
+// -----------------------------------------------------------------------------
+
+describe('desugarToggles', () => {
+  it('returns null when no toggles active', () => {
+    expect(desugarToggles(inactiveState)).toBeNull()
+  })
+
+  it('desugars firstTimeOnly → preset firstTimer', () => {
+    expect(desugarToggles({ ...inactiveState, firstTimeOnly: true })).toEqual({
+      kind: 'preset',
+      name: 'firstTimer',
+    })
+  })
+
+  it('desugars subscribersOnly → preset sub', () => {
+    expect(desugarToggles({ ...inactiveState, subscribersOnly: true })).toEqual({
+      kind: 'preset',
+      name: 'sub',
+    })
+  })
+
+  it('desugars hypeModeOnly → preset hype', () => {
+    expect(desugarToggles({ ...inactiveState, hypeModeOnly: true })).toEqual({
+      kind: 'preset',
+      name: 'hype',
+    })
+  })
+
+  it('desugars keyword → keyword AST node', () => {
+    expect(desugarToggles({ ...inactiveState, keyword: 'pog' })).toEqual({
+      kind: 'keyword',
+      value: 'pog',
+    })
+  })
+
+  it('composes multiple toggles with AND', () => {
+    const ast = desugarToggles({
+      firstTimeOnly: true,
+      subscribersOnly: true,
+      keyword: 'pog',
+      hypeModeOnly: false,
+    })
+    expect(ast).toMatchObject({
+      kind: 'and',
+      children: [
+        { kind: 'preset', name: 'firstTimer' },
+        { kind: 'preset', name: 'sub' },
+        { kind: 'keyword', value: 'pog' },
+      ],
+    })
+  })
+})
+
+// -----------------------------------------------------------------------------
+// applyFilters — Phase 8 query composition
+// -----------------------------------------------------------------------------
+
+describe('applyFilters — query', () => {
+  it('applies a DSL query when no toggles are active', () => {
+    const messages = [
+      makeMessage({ id: 'a', text: 'pog champ' }),
+      makeMessage({ id: 'b', text: 'meh' }),
+    ]
+    const result = applyFilters(
+      messages,
+      { ...inactiveState, query: 'kw:"pog"', queryError: null },
+      neverSpike,
+    )
+    expect(result.map((m) => m.id)).toEqual(['a'])
+  })
+
+  it('composes toggles AND query', () => {
+    const messages = [
+      makeMessage({ id: 'a', isFirstInSession: true, text: 'pog' }),
+      makeMessage({ id: 'b', isFirstInSession: true, text: 'nope' }),
+      makeMessage({ id: 'c', isFirstInSession: false, text: 'pog' }),
+    ]
+    const result = applyFilters(
+      messages,
+      { ...inactiveState, firstTimeOnly: true, query: 'kw:"pog"' },
+      neverSpike,
+    )
+    expect(result.map((m) => m.id)).toEqual(['a'])
+  })
+
+  it('treats parse error as inactive query (toggles still apply)', () => {
+    const messages = [
+      makeMessage({ id: 'a', badges: [subscriberBadge] }),
+      makeMessage({ id: 'b', badges: [] }),
+    ]
+    const result = applyFilters(
+      messages,
+      { ...inactiveState, subscribersOnly: true, query: 'bad)(' },
+      neverSpike,
+    )
+    expect(result.map((m) => m.id)).toEqual(['a'])
   })
 })

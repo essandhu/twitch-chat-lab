@@ -17,8 +17,10 @@ import { LeftRail } from './components/shell/LeftRail'
 import { ChatDock } from './components/shell/ChatDock'
 import { ChatPanel } from './features/chat/ChatPanel'
 import { HeatmapPanel } from './features/heatmap/HeatmapPanel'
+import { MultiStreamChatDock } from './features/multiStream/MultiStreamChatDock'
 import { MultiStreamLayout } from './features/multiStream/MultiStreamLayout'
 import { PerfOverlay } from './features/perfPanel/PerfOverlay'
+import { applyFilterFromUrl } from './features/filters/applyFilterFromUrl'
 import { getDemoConfig, isDemoMode } from './services/DemoModeService'
 import { logger } from './lib/logger'
 
@@ -144,6 +146,17 @@ export const LandingView = () => {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
+  const urlFilterAppliedRef = useRef(false)
+  useEffect(() => {
+    if (urlFilterAppliedRef.current) return
+    urlFilterAppliedRef.current = true
+    applyFilterFromUrl({
+      isMultiActive: useMultiStreamStore.getState().isActive,
+      setChatFilter: (partial) => useChatStore.getState().setFilterState(partial),
+      applyToAllStreams: (state) => useMultiStreamStore.getState().applyFilterToAllStreams(state),
+    })
+  }, [])
+
   return (
     <>
       <AppShell
@@ -155,8 +168,12 @@ export const LandingView = () => {
           </MainPane>
         }
         dock={
-          isMultiActive ? null : (
-            <ChatDock>
+          isMultiActive ? (
+            <ChatDock key="multi">
+              <MultiStreamChatDock />
+            </ChatDock>
+          ) : (
+            <ChatDock key="single">
               <ChatDockContent />
             </ChatDock>
           )
