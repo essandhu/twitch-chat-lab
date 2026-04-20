@@ -197,6 +197,94 @@ describe('updateCompare', () => {
     expect(client.createSession).toHaveBeenCalledTimes(1)
   })
 
+  it('PATCH fast path preserves overlapping channels\' slices (messages, order) and only resets the removed/added ones', async () => {
+    const client = makeFakeClient()
+    client.patchSession = vi.fn(async () => ({
+      sessionId: 'sess-current',
+      channels: ['alice', 'bob', 'dave'],
+    }))
+
+    await startCompare({
+      session: makeSession('alice'),
+      authedUserId: 'u1',
+      picks: [pick('bob'), pick('carol')],
+      clientFactory: () => asClient(client),
+    })
+
+    // Seed bob's slice with some state so we can detect whether it survives.
+    const store = useMultiStreamStore.getState()
+    useMultiStreamStore.setState({
+      streams: {
+        ...store.streams,
+        bob: {
+          ...store.streams.bob!,
+          _counter: 42,
+          connectionState: 'ready',
+        },
+      },
+    })
+    // Sanity: before PATCH, all three channels are in the store.
+    expect(Object.keys(useMultiStreamStore.getState().streams).sort()).toEqual([
+      'alice',
+      'bob',
+      'carol',
+    ])
+
+    // Swap carol → dave.
+    await updateCompare({
+      session: makeSession('alice'),
+      authedUserId: 'u1',
+      picks: [pick('bob'), pick('dave')],
+      clientFactory: () => {
+        throw new Error('clientFactory should not be invoked on PATCH fast path')
+      },
+    })
+
+    const after = useMultiStreamStore.getState()
+    // alice + bob preserved; carol gone; dave added.
+    expect(Object.keys(after.streams).sort()).toEqual(['alice', 'bob', 'dave'])
+    // Bob's prior state is intact — the whole point of the fast path.
+    expect(after.streams.bob?._counter).toBe(42)
+    expect(after.streams.bob?.connectionState).toBe('ready')
+    // Dave arrives in the connecting state (fresh slice).
+    expect(after.streams.dave?.connectionState).toBe('connecting')
+  })
+
+  it('no-op PATCH (empty diff) does NOT wipe existing slices', async () => {
+    const client = makeFakeClient()
+    await startCompare({
+      session: makeSession('alice'),
+      authedUserId: 'u1',
+      picks: [pick('bob')],
+      clientFactory: () => asClient(client),
+    })
+
+    const store = useMultiStreamStore.getState()
+    useMultiStreamStore.setState({
+      streams: {
+        ...store.streams,
+        bob: {
+          ...store.streams.bob!,
+          _counter: 7,
+          connectionState: 'ready',
+        },
+      },
+    })
+
+    await updateCompare({
+      session: makeSession('alice'),
+      authedUserId: 'u1',
+      picks: [pick('bob')],
+      clientFactory: () => {
+        throw new Error('factory should not fire for a no-op update')
+      },
+    })
+
+    const after = useMultiStreamStore.getState()
+    expect(after.streams.bob?._counter).toBe(7)
+    expect(after.streams.bob?.connectionState).toBe('ready')
+  })
+
   it('falls back to full recreate when PATCH fails', async () => {
     const firstClient = makeFakeClient()
     firstClient.patchSession = vi.fn(async () => {

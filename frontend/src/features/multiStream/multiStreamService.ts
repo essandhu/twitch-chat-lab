@@ -262,9 +262,9 @@ export const updateCompare = async (args: UpdateCompareArgs): Promise<void> => {
     if (currentClient && currentSessionId && activeChannels.length > 0) {
       const diff = diffChannels(activeChannels, nextChannels)
       if (diff.add.length === 0 && diff.remove.length === 0) {
-        // Nothing to do — just refresh the store so display-name
-        // changes (e.g., re-capitalizations) still land.
-        seedStore({ session: args.session, picks: args.picks })
+        // No channel change — the store already reflects reality. Skip the
+        // reset-and-reseed dance; it would wipe cached messages and flip
+        // every column back to "connecting" for nothing.
         useMultiStreamStore.getState().setActive(true)
         activeChannels = nextChannels
         logger.info('multiStream.update.noop')
@@ -278,8 +278,31 @@ export const updateCompare = async (args: UpdateCompareArgs): Promise<void> => {
           userId: args.authedUserId,
           accessToken: token,
         })
-        seedStore({ session: args.session, picks: args.picks })
-        useMultiStreamStore.getState().setActive(true)
+        // Incremental store mutation: overlapping slices KEEP their cached
+        // messages, connectionState, annotations, etc. Only channels in
+        // diff.remove disappear and channels in diff.add arrive in the
+        // connecting state. Without this, the PATCH fast path gives the
+        // user the same "all columns reload" UX as a full recreate.
+        const store = useMultiStreamStore.getState()
+        for (const login of diff.remove) {
+          store.removeStream(login)
+        }
+        for (const entry of diff.add) {
+          store.addStream({
+            login: entry.login,
+            displayName: entry.displayName,
+            broadcasterId: entry.broadcasterId,
+          })
+        }
+        store.setActive(true)
+        // Hydrate profile images only for net-new picks — the overlapping
+        // channels already have theirs (or have the letter fallback in
+        // flight). Session's own avatar was set at startCompare time.
+        hydrateProfileImages(
+          diff.add
+            .map((c) => c.login)
+            .filter((l) => l !== args.session.broadcasterLogin),
+        )
         activeChannels = nextChannels
         logger.info('multiStream.update.patched', {
           added: diff.add.map((c) => c.login),
