@@ -307,6 +307,46 @@ func (h *Hub) ReleaseIdlePool(streamLogin, userID string) {
 	p.onDrainExpire()
 }
 
+// CompressDrain replaces the pool's in-flight drain timer with one
+// scheduled for maxGrace from now. Intended for the POST /session
+// partial-failure path: closing the conns just kicked the last
+// subscribers off, starting the default 30s drain; compressing to ~2s
+// preserves the warm-pool benefit for an immediate human retry (which
+// joins the still-warm pool and cancels the timer) while freeing
+// Twitch WS transport slots fast enough that the retry — or the
+// single-stream EventSub reconnect that happens on failure — isn't
+// blocked by the per-user transport cap.
+//
+// No-op when the pool doesn't exist, still has active subscribers, is
+// already torn down, or isn't currently draining (drain timer nil).
+// If maxGrace <= 0, falls through to ReleaseIdlePool for immediate
+// teardown so one seam covers both strict and short-drain policies.
+//
+// Only meaningful as a SHORTENING operation — callers supplying a
+// maxGrace longer than the hub's default drainGrace will effectively
+// extend the drain, which is not what this method is for. Keep
+// maxGrace well below drainGrace.
+func (h *Hub) CompressDrain(streamLogin, userID string, maxGrace time.Duration) {
+	if maxGrace <= 0 {
+		h.ReleaseIdlePool(streamLogin, userID)
+		return
+	}
+	key := poolKey{StreamLogin: streamLogin, UserID: userID}
+	h.mu.Lock()
+	p, ok := h.pools[key]
+	h.mu.Unlock()
+	if !ok {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.tornDown || len(p.subscribers) > 0 || p.drainTimer == nil {
+		return
+	}
+	p.drainTimer.Stop()
+	p.drainTimer = p.hub.newTimer(maxGrace, p.onDrainExpire)
+}
+
 // pool holds exactly one upstream EventSub connection along with the set
 // of downstream subscribers fanning off it.
 type pool struct {

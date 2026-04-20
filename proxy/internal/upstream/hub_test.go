@@ -560,6 +560,157 @@ func TestHub_ReleaseIdlePool_AllowsReopen(t *testing.T) {
 	}
 }
 
+// Test: CompressDrain on a draining pool stops the in-flight (long) timer
+// and installs a new one. Firing the new timer tears the pool down — the
+// old timer is already stopped and Fire() is a no-op on it.
+func TestHub_CompressDrain_ShortensDrainTimer(t *testing.T) {
+	f := newHubFixture(t)
+	defer f.hub.Shutdown()
+
+	p := baseParams("alice", "u1")
+	p.OnFrame = func([]byte) {}
+
+	sub, err := f.hub.Subscribe(context.Background(), p)
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	_ = sub.Close()
+
+	first := f.latestTimer()
+	if first == nil {
+		t.Fatalf("expected drain timer after Close")
+	}
+
+	f.hub.CompressDrain("alice", "u1", 10*time.Millisecond)
+
+	second := f.latestTimer()
+	if second == nil {
+		t.Fatalf("expected a new drain timer after CompressDrain")
+	}
+	if second == first {
+		t.Fatalf("CompressDrain must install a NEW timer, got same ptr")
+	}
+	if !first.stopped.Load() {
+		t.Fatalf("CompressDrain did not stop the original drain timer")
+	}
+
+	// Firing the original is a no-op — it was stopped.
+	first.Fire()
+	if f.unsubCount.Load() != 0 {
+		t.Fatalf("stopped timer fired and tore down: unsubCount=%d", f.unsubCount.Load())
+	}
+
+	// Firing the replacement tears the pool down.
+	second.Fire()
+	if !waitCond(1*time.Second, func() bool { return f.unsubCount.Load() == 1 }) {
+		t.Fatalf("unsubscribe never called after compressed drain fired (got %d)", f.unsubCount.Load())
+	}
+}
+
+// Test: CompressDrain is a no-op when the pool still has active
+// subscribers — the drain timer they implied was never installed and
+// must not be replaced with a soon-to-fire one.
+func TestHub_CompressDrain_NoopWhenActive(t *testing.T) {
+	f := newHubFixture(t)
+	defer f.hub.Shutdown()
+
+	p := baseParams("alice", "u1")
+	p.OnFrame = func([]byte) {}
+
+	sub, err := f.hub.Subscribe(context.Background(), p)
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	defer sub.Close()
+
+	before := len(f.timers)
+	f.hub.CompressDrain("alice", "u1", 10*time.Millisecond)
+
+	f.timersMu.Lock()
+	after := len(f.timers)
+	f.timersMu.Unlock()
+	if after != before {
+		t.Fatalf("CompressDrain installed a timer for an active pool: before=%d after=%d", before, after)
+	}
+	if f.unsubCount.Load() != 0 {
+		t.Fatalf("CompressDrain on active pool triggered teardown: unsubCount=%d", f.unsubCount.Load())
+	}
+}
+
+// Test: CompressDrain on an unknown (streamLogin, userID) is a safe no-op.
+func TestHub_CompressDrain_NoopWhenMissing(t *testing.T) {
+	f := newHubFixture(t)
+	defer f.hub.Shutdown()
+
+	f.hub.CompressDrain("nonexistent", "nouser", 10*time.Millisecond)
+	if f.unsubCount.Load() != 0 {
+		t.Fatalf("expected 0 unsubscribes for missing key, got %d", f.unsubCount.Load())
+	}
+}
+
+// Test: CompressDrain with maxGrace <= 0 falls through to the strict
+// ReleaseIdlePool path, tearing the pool down NOW.
+func TestHub_CompressDrain_ZeroGraceTearsDownNow(t *testing.T) {
+	f := newHubFixture(t)
+	defer f.hub.Shutdown()
+
+	p := baseParams("alice", "u1")
+	p.OnFrame = func([]byte) {}
+
+	sub, err := f.hub.Subscribe(context.Background(), p)
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	_ = sub.Close()
+
+	f.hub.CompressDrain("alice", "u1", 0)
+
+	if !waitCond(1*time.Second, func() bool { return f.unsubCount.Load() == 1 }) {
+		t.Fatalf("zero-grace did not tear down (unsubCount=%d)", f.unsubCount.Load())
+	}
+}
+
+// Test: a Subscribe arriving inside the compressed window joins the
+// warm pool and cancels the timer — no upstream rebuild. This is the
+// whole point of CompressDrain: preserve the warm-pool benefit for
+// rapid human retries.
+func TestHub_CompressDrain_RetryReusesWarmPool(t *testing.T) {
+	f := newHubFixture(t)
+	defer f.hub.Shutdown()
+
+	p := baseParams("alice", "u1")
+	p.OnFrame = func([]byte) {}
+
+	sub1, err := f.hub.Subscribe(context.Background(), p)
+	if err != nil {
+		t.Fatalf("subscribe 1: %v", err)
+	}
+	_ = sub1.Close()
+
+	// Simulate the POST-failure teardown compressing the drain.
+	f.hub.CompressDrain("alice", "u1", 10*time.Millisecond)
+
+	// Retry before firing — should reuse the pool and cancel the drain.
+	sub2, err := f.hub.Subscribe(context.Background(), p)
+	if err != nil {
+		t.Fatalf("subscribe 2 (retry): %v", err)
+	}
+	defer sub2.Close()
+
+	if f.openCount.Load() != 1 {
+		t.Fatalf("expected warm-pool reuse (1 open), got %d", f.openCount.Load())
+	}
+
+	// Firing the compressed timer must be a no-op — it was stopped by
+	// addSubscriber when the retry joined.
+	if tim := f.latestTimer(); tim != nil {
+		tim.Fire()
+	}
+	if f.unsubCount.Load() != 0 {
+		t.Fatalf("timer fired after retry joined: unsubCount=%d", f.unsubCount.Load())
+	}
+}
+
 // Test: concurrent Subscribe calls for the same key serialize on pool init
 // — exactly one open + register regardless of caller count.
 func TestHub_Subscribe_ConcurrentSameKeyOpensOnce(t *testing.T) {

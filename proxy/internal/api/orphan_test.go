@@ -135,9 +135,13 @@ func TestPostSession_OrphanReaperRemovesUnconnectedSession(t *testing.T) {
 		t.Fatal("session missing from registry immediately after POST")
 	}
 
+	// Poll on BOTH registry emptiness AND the session.orphaned log line.
+	// registry.Remove deletes from the map before Stop (and thus the log
+	// line) completes, so polling only on registry state races the log.
 	deadline := time.Now().Add(1 * time.Second)
 	for time.Now().Before(deadline) {
-		if _, ok := reg.Get(parsed.SessionID); !ok {
+		_, stillPresent := reg.Get(parsed.SessionID)
+		if !stillPresent && strings.Contains(buf.String(), "session.orphaned") {
 			break
 		}
 		time.Sleep(5 * time.Millisecond)
@@ -147,6 +151,101 @@ func TestPostSession_OrphanReaperRemovesUnconnectedSession(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "session.orphaned") {
 		t.Fatalf("expected session.orphaned log, got:\n%s", buf.String())
+	}
+}
+
+// TestPostSession_OrphanReleasesIdlePools verifies that when the orphan
+// reaper fires on a session the client never attached to, each of the
+// session's pools is released immediately rather than sitting in the
+// 30s drain grace. An orphaned session is "client is gone" by
+// definition — the grace's tab-reload premise doesn't apply.
+func TestPostSession_OrphanReleasesIdlePools(t *testing.T) {
+	// Custom helix stub that returns broadcaster ids for alice + bob.
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth2/validate", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"user_id":"u-1","login":"u","expires_in":3600}`))
+	})
+	mux.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+		logins := r.URL.Query()["login"]
+		out := make([]map[string]string, 0, len(logins))
+		for _, l := range logins {
+			out = append(out, map[string]string{"id": "bcast-" + l, "login": l, "display_name": l})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": out})
+	})
+	helix := httptest.NewServer(mux)
+	t.Cleanup(helix.Close)
+
+	var buf syncBuf
+	log := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	cfg := &config.Config{ClientID: "client-test", Port: "0"}
+	r := api.BuildRouter(cfg, log)
+	reg := aggregator.NewRegistry()
+	t.Cleanup(reg.CloseAll)
+
+	var releaseMu sync.Mutex
+	var releases []struct{ login, userID string }
+
+	api.RegisterSessionRoutes(r, api.SessionHandlerDeps{
+		Registry:      reg,
+		Logger:        log,
+		Config:        cfg,
+		HTTPClient:    http.DefaultClient,
+		HelixBaseURL:  helix.URL,
+		ValidateURL:   helix.URL + "/oauth2/validate",
+		OrphanTimeout: 50 * time.Millisecond,
+		Subscribe: func(ctx context.Context, p upstream.SubscribeParams) (aggregator.Conn, error) {
+			return newInertConn(), nil
+		},
+		ReleaseIdlePool: func(streamLogin, userID string) {
+			releaseMu.Lock()
+			defer releaseMu.Unlock()
+			releases = append(releases, struct{ login, userID string }{streamLogin, userID})
+		},
+	})
+
+	body := `{"channels":["alice","bob"],"user_id":"u-1","access_token":"orphan-release-tok-1"}`
+	req := httptest.NewRequest(http.MethodPost, "/session", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d body=%s logs=%s", rr.Code, rr.Body.String(), buf.String())
+	}
+	var parsed struct {
+		SessionID string `json:"session_id"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &parsed); err != nil {
+		t.Fatalf("response not JSON: %v", err)
+	}
+
+	// Wait for the orphan reaper to both remove the session AND fire the
+	// ReleaseIdlePool callbacks.
+	deadline := time.Now().Add(1 * time.Second)
+	for time.Now().Before(deadline) {
+		releaseMu.Lock()
+		done := len(releases) >= 2
+		releaseMu.Unlock()
+		if done {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	releaseMu.Lock()
+	defer releaseMu.Unlock()
+	released := map[string]bool{}
+	for _, rc := range releases {
+		if rc.userID != "u-1" {
+			t.Fatalf("expected userID=u-1, got %q", rc.userID)
+		}
+		released[rc.login] = true
+	}
+	if !released["alice"] || !released["bob"] {
+		t.Fatalf("expected releases for alice+bob after orphan, got %v (logs=%s)", releases, buf.String())
+	}
+	if len(releases) != 2 {
+		t.Fatalf("expected exactly 2 releases, got %d: %v", len(releases), releases)
 	}
 }
 
