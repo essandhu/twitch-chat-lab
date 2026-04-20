@@ -155,9 +155,11 @@ export const LandingView = () => {
           </MainPane>
         }
         dock={
-          <ChatDock forceCollapsed={isMultiActive}>
-            <ChatDockContent />
-          </ChatDock>
+          isMultiActive ? null : (
+            <ChatDock>
+              <ChatDockContent />
+            </ChatDock>
+          )
         }
       />
       <ErrorBoundary label="Perf overlay" fallback={() => null}>
