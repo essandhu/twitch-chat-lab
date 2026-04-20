@@ -11,6 +11,8 @@ import { buildChatMessage } from './chatMessageMapper'
 const MESSAGE_BUFFER_CAP = 5000
 const ROLLING_WINDOW_POINTS = 300 // 5 minutes at 1-second cadence
 
+export type StreamConnectionState = 'connecting' | 'ready' | 'degraded'
+
 export interface StreamSlice {
   login: string
   displayName: string
@@ -23,7 +25,7 @@ export interface StreamSlice {
   dataPoints: HeatmapDataPoint[]
   annotations: EventAnnotation[]
   _counter: number
-  isDegraded: boolean
+  connectionState: StreamConnectionState
 }
 
 export interface MultiStreamStoreState {
@@ -39,6 +41,8 @@ export interface MultiStreamStoreState {
   tickAll: () => void
   reset: () => void
   setActive: (active: boolean) => void
+  setConnectionState: (login: string, state: StreamConnectionState) => void
+  markReady: (login: string) => void
   setDegraded: (login: string, degraded: boolean) => void
 }
 
@@ -56,7 +60,7 @@ const createEmptySlice = (
   dataPoints: [],
   annotations: [],
   _counter: 0,
-  isDegraded: false,
+  connectionState: 'connecting',
 })
 
 export const useMultiStreamStore = create<MultiStreamStoreState>((set) => ({
@@ -103,9 +107,15 @@ export const useMultiStreamStore = create<MultiStreamStoreState>((set) => ({
           ? [...slice.messages.slice(slice.messages.length - MESSAGE_BUFFER_CAP + 1), chatMessage]
           : [...slice.messages, chatMessage]
 
+      // First message is strong evidence the subscription is live — promote from
+      // connecting to ready. Leave degraded alone; that transition needs an
+      // explicit recovery signal.
+      const nextConnectionState: StreamConnectionState =
+        slice.connectionState === 'connecting' ? 'ready' : slice.connectionState
+
       let nextSlice: StreamSlice
       if (!isFirst) {
-        nextSlice = { ...slice, messages: nextMessages }
+        nextSlice = { ...slice, messages: nextMessages, connectionState: nextConnectionState }
       } else {
         const seenUserIds = new Set(slice.seenUserIds)
         seenUserIds.add(raw.chatter_user_id)
@@ -121,6 +131,7 @@ export const useMultiStreamStore = create<MultiStreamStoreState>((set) => ({
           messages: nextMessages,
           seenUserIds,
           firstTimers: [...slice.firstTimers, firstTimerEntry],
+          connectionState: nextConnectionState,
         }
       }
 
@@ -193,16 +204,48 @@ export const useMultiStreamStore = create<MultiStreamStoreState>((set) => ({
 
   setActive: (active) => set({ isActive: active }),
 
+  setConnectionState: (login, nextState) =>
+    set((state) => {
+      const slice = state.streams[login]
+      if (!slice || slice.connectionState === nextState) {
+        return state
+      }
+      return {
+        streams: {
+          ...state.streams,
+          [login]: { ...slice, connectionState: nextState },
+        },
+      }
+    }),
+
+  markReady: (login) =>
+    set((state) => {
+      const slice = state.streams[login]
+      if (!slice || slice.connectionState !== 'connecting') {
+        return state
+      }
+      return {
+        streams: {
+          ...state.streams,
+          [login]: { ...slice, connectionState: 'ready' },
+        },
+      }
+    }),
+
   setDegraded: (login, degraded) =>
     set((state) => {
       const slice = state.streams[login]
       if (!slice) {
         return state
       }
+      const nextConnection: StreamConnectionState = degraded ? 'degraded' : 'ready'
+      if (slice.connectionState === nextConnection) {
+        return state
+      }
       return {
         streams: {
           ...state.streams,
-          [login]: { ...slice, isDegraded: degraded },
+          [login]: { ...slice, connectionState: nextConnection },
         },
       }
     }),

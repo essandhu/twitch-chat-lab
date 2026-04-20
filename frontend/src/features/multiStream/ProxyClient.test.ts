@@ -330,9 +330,10 @@ describe('ProxyClient', () => {
 
     sockets[0]!.emitMessage({ error: 'upstream_lost', stream_login: 'alice' })
 
-    expect(useMultiStreamStore.getState().streams.alice?.isDegraded).toBe(true)
-    // bob is not affected
-    expect(useMultiStreamStore.getState().streams.bob?.isDegraded).toBe(false)
+    expect(useMultiStreamStore.getState().streams.alice?.connectionState).toBe('degraded')
+    // bob is not affected — stays in its initial connecting state since we
+    // haven't seen any frames tagged with its login.
+    expect(useMultiStreamStore.getState().streams.bob?.connectionState).toBe('connecting')
     // Crucially, the WS is NOT closed by the upstream_lost frame.
     expect(sockets[0]!.close).not.toHaveBeenCalled()
     expect(client.isConnected()).toBe(true)
