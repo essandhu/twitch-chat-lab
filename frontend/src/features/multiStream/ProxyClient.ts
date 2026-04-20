@@ -230,6 +230,12 @@ export class ProxyClient {
       }
     }
 
+    // Any frame tied to a specific channel means that channel's subscription
+    // is live upstream — promote it out of the "connecting" state. addMessage
+    // does the same for chat frames, but keepalives arrive first and let us
+    // clear the spinner for quiet channels.
+    useMultiStreamStore.getState().markReady(envelope.stream_login)
+
     if (envelope.event_type === 'session_keepalive') {
       this.logger.debug('proxy.keepalive', { streamLogin: envelope.stream_login })
       return

@@ -16,6 +16,12 @@ interface StreamSelectorProps {
   currentLogin: string
   onConfirm: (picks: StreamPick[]) => void
   onCancel: () => void
+  /**
+   * Channels already in an active comparison. Rendered pre-checked at the top
+   * of the list, even if they don't appear in the Helix category results
+   * (e.g., the user's peers went offline since the compare started).
+   */
+  initialSelected?: StreamPick[]
 }
 
 type LoadState =
@@ -31,14 +37,33 @@ const streamToPick = (s: HelixStream): StreamPick => ({
   displayName: s.user_name,
 })
 
+// Synthesize a minimal HelixStream-shaped row for a pre-selected pick that
+// isn't in the Helix results. viewer_count 0 tells the renderer to hide the
+// viewer tag; we don't have a live number and we shouldn't invent one.
+const pickToSyntheticStream = (p: StreamPick): HelixStream => ({
+  id: `preselected_${p.login}`,
+  user_id: p.broadcasterId,
+  user_login: p.login,
+  user_name: p.displayName,
+  title: '',
+  game_id: '',
+  game_name: '',
+  viewer_count: 0,
+  started_at: '',
+  thumbnail_url: '',
+})
+
 export const StreamSelector = ({
   gameId,
   currentLogin,
   onConfirm,
   onCancel,
+  initialSelected = [],
 }: StreamSelectorProps) => {
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(initialSelected.map((p) => p.login)),
+  )
 
   const load = useCallback(async () => {
     setLoadState({ status: 'loading' })
@@ -72,15 +97,28 @@ export const StreamSelector = ({
     })
   }
 
-  const availableStreams = loadState.status === 'ready' ? loadState.streams : []
+  // Merge Helix results with any pre-selected channels missing from them, so
+  // the dropdown accurately reflects the user's current comparison even for
+  // peers who have gone offline since compare started.
+  const displayedStreams = useMemo((): HelixStream[] => {
+    const helix = loadState.status === 'ready' ? loadState.streams : []
+    const helixLogins = new Set(helix.map((s) => s.user_login))
+    const missingPreselected = initialSelected
+      .filter((p) => !helixLogins.has(p.login))
+      .map(pickToSyntheticStream)
+    // Pre-selected rows render first so they're not buried below category
+    // peers and the user can see them without scrolling.
+    return [...missingPreselected, ...helix]
+  }, [loadState, initialSelected])
 
-  const picks: StreamPick[] = useMemo(
-    () =>
-      availableStreams
-        .filter((s) => selected.has(s.user_login))
-        .map(streamToPick),
-    [availableStreams, selected],
-  )
+  const picks: StreamPick[] = useMemo(() => {
+    // Resolve picks from the displayed list so broadcaster_id / display_name
+    // round-trip through (even for rows that only exist because they were
+    // pre-selected).
+    return displayedStreams
+      .filter((s) => selected.has(s.user_login))
+      .map(streamToPick)
+  }, [displayedStreams, selected])
 
   const canCompare = picks.length >= 1 && picks.length <= MAX_PICKS
 
@@ -129,17 +167,19 @@ export const StreamSelector = ({
           </div>
         )}
 
-        {loadState.status === 'ready' && availableStreams.length === 0 && (
+        {loadState.status === 'ready' && displayedStreams.length === 0 && (
           <p className="py-6 text-sm text-text-muted">
             no other streams live in this category right now
           </p>
         )}
 
-        {loadState.status === 'ready' && availableStreams.length > 0 && (
+        {loadState.status === 'ready' && displayedStreams.length > 0 && (
           <ul className="flex flex-col gap-2">
-            {availableStreams.map((s) => {
+            {displayedStreams.map((s) => {
               const checked = selected.has(s.user_login)
               const disabled = !checked && selected.size >= MAX_PICKS
+              const isPreselectedOffline =
+                s.id.startsWith('preselected_') && s.viewer_count === 0
               return (
                 <li key={s.user_login}>
                   <label
@@ -159,9 +199,15 @@ export const StreamSelector = ({
                     />
                     <span className="flex-1">
                       <span className="font-semibold text-text">{s.user_name}</span>
-                      <span className="ml-2 text-text-muted">
-                        {s.viewer_count.toLocaleString('en-US')} viewers
-                      </span>
+                      {isPreselectedOffline ? (
+                        <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.2em] text-text-muted">
+                          current selection
+                        </span>
+                      ) : (
+                        <span className="ml-2 text-text-muted">
+                          {s.viewer_count.toLocaleString('en-US')} viewers
+                        </span>
+                      )}
                     </span>
                   </label>
                 </li>

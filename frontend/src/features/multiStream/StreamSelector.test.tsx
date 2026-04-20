@@ -118,6 +118,65 @@ describe('StreamSelector', () => {
     expect(alice.broadcasterId).toBe('uid_alice')
   })
 
+  it('pre-checks initialSelected entries and enables Compare immediately', async () => {
+    getStreamsByCategory.mockResolvedValue([
+      helixStream('alice', 'Alice'),
+      helixStream('bob', 'Bob'),
+    ])
+
+    const onConfirm = vi.fn()
+    render(
+      <StreamSelector
+        gameId="g1"
+        currentLogin="broadcaster"
+        onConfirm={onConfirm}
+        onCancel={vi.fn()}
+        initialSelected={[
+          { login: 'alice', displayName: 'Alice', broadcasterId: 'uid_alice' },
+        ]}
+      />,
+    )
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Select Alice')).toBeChecked(),
+    )
+    expect(screen.getByLabelText('Select Bob')).not.toBeChecked()
+
+    const compareBtn = screen.getByRole('button', { name: /compare/i })
+    expect(compareBtn).not.toBeDisabled()
+
+    fireEvent.click(compareBtn)
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+    const picks = onConfirm.mock.calls[0]![0] as Array<{ login: string; broadcasterId: string }>
+    expect(picks.map((p) => p.login)).toEqual(['alice'])
+    expect(picks[0]!.broadcasterId).toBe('uid_alice')
+  })
+
+  it('includes pre-selected channels that are missing from the Helix results, checked', async () => {
+    // Helix no longer returns "carol" (she went offline), but the user is
+    // already comparing with her — the dropdown should still show her as
+    // checked so deselection is discoverable.
+    getStreamsByCategory.mockResolvedValue([helixStream('alice', 'Alice')])
+
+    render(
+      <StreamSelector
+        gameId="g1"
+        currentLogin="broadcaster"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+        initialSelected={[
+          { login: 'carol', displayName: 'Carol', broadcasterId: 'uid_carol' },
+        ]}
+      />,
+    )
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Select Carol')).toBeChecked(),
+    )
+    expect(screen.getByText('Carol')).toBeInTheDocument()
+    expect(screen.getByText(/current selection/i)).toBeInTheDocument()
+  })
+
   it('renders the empty-state message when the Helix response is empty after filtering', async () => {
     getStreamsByCategory.mockResolvedValue([
       helixStream('broadcaster', 'Broadcaster'),

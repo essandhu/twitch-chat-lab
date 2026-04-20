@@ -157,6 +157,51 @@ describe('multiStreamStore', () => {
     vi.useRealTimers()
   })
 
+  it('new slices start in connecting state', () => {
+    const s = useMultiStreamStore.getState()
+    s.addStream({ login: 'alice', displayName: 'Alice', broadcasterId: 'b_alice' })
+    expect(useMultiStreamStore.getState().streams.alice?.connectionState).toBe('connecting')
+  })
+
+  it('markReady promotes connecting -> ready, leaves degraded alone', () => {
+    const s = useMultiStreamStore.getState()
+    s.addStream({ login: 'alice', displayName: 'Alice', broadcasterId: 'b_alice' })
+    s.addStream({ login: 'bob', displayName: 'Bob', broadcasterId: 'b_bob' })
+
+    // Degrade bob first — markReady must not silently resurrect it.
+    useMultiStreamStore.getState().setDegraded('bob', true)
+
+    useMultiStreamStore.getState().markReady('alice')
+    useMultiStreamStore.getState().markReady('bob')
+
+    const state = useMultiStreamStore.getState()
+    expect(state.streams.alice?.connectionState).toBe('ready')
+    expect(state.streams.bob?.connectionState).toBe('degraded')
+  })
+
+  it('addMessage flips connecting -> ready but leaves degraded alone', () => {
+    const s = useMultiStreamStore.getState()
+    s.addStream({ login: 'alice', displayName: 'Alice', broadcasterId: 'b_alice' })
+    s.addStream({ login: 'bob', displayName: 'Bob', broadcasterId: 'b_bob' })
+    useMultiStreamStore.getState().setDegraded('bob', true)
+
+    useMultiStreamStore.getState().addMessage('alice', makeRawEvent('u1', 'hi'))
+    useMultiStreamStore.getState().addMessage('bob', makeRawEvent('u2', 'hi'))
+
+    const state = useMultiStreamStore.getState()
+    expect(state.streams.alice?.connectionState).toBe('ready')
+    expect(state.streams.bob?.connectionState).toBe('degraded')
+  })
+
+  it('setDegraded(login, false) flips back to ready', () => {
+    const s = useMultiStreamStore.getState()
+    s.addStream({ login: 'alice', displayName: 'Alice', broadcasterId: 'b_alice' })
+    useMultiStreamStore.getState().setDegraded('alice', true)
+    expect(useMultiStreamStore.getState().streams.alice?.connectionState).toBe('degraded')
+    useMultiStreamStore.getState().setDegraded('alice', false)
+    expect(useMultiStreamStore.getState().streams.alice?.connectionState).toBe('ready')
+  })
+
   it('setActive(false) and reset() clear isActive and every slice', () => {
     const s = useMultiStreamStore.getState()
     s.addStream({ login: 'alice', displayName: 'Alice', broadcasterId: 'b_alice' })
