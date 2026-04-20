@@ -12,11 +12,13 @@ export function useFilteredRows(): ChatRow[] {
   const isDuringSpike = useHeatmapStore.getState().isDuringSpike
 
   return useMemo(() => {
+    const hasActiveQuery = Boolean(filterState.query && filterState.query.trim().length > 0)
     const hasActiveFilter =
       filterState.firstTimeOnly ||
       filterState.subscribersOnly ||
       filterState.keyword.trim().length > 0 ||
-      filterState.hypeModeOnly
+      filterState.hypeModeOnly ||
+      hasActiveQuery
     if (!hasActiveFilter) return rows
 
     return rows.filter((row) => {

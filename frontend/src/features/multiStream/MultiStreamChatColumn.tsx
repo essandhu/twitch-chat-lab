@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChatList } from '../chat/ChatList'
-import { useMultiStreamStore, useStreamSlice } from '../../store/multiStreamStore'
+import { useMultiStreamStore, useStreamSlice, DEFAULT_FILTER_STATE } from '../../store/multiStreamStore'
 import { Card } from '../../components/ui/Card'
 import { IconButton } from '../../components/ui/IconButton'
 import { Avatar } from '../../components/ui/Avatar'
+import { FilterToolbar } from '../filters/FilterToolbar'
+import { applyFilters } from '../filters/filterLogic'
+import { isDuringSpikeFor } from './derivedIsDuringSpike'
 
 interface MultiStreamChatColumnProps {
   streamLogin: string
@@ -11,7 +14,16 @@ interface MultiStreamChatColumnProps {
 
 export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProps): JSX.Element | null {
   const slice = useStreamSlice(streamLogin)
+  const filterState = useMultiStreamStore((s) => s.filterState[streamLogin]) ?? DEFAULT_FILTER_STATE
+  const setStreamFilter = useMultiStreamStore((s) => s.setStreamFilter)
+  const applyFilterToAllStreams = useMultiStreamStore((s) => s.applyFilterToAllStreams)
   const [bannerDismissed, setBannerDismissed] = useState(false)
+
+  const filteredMessages = useMemo(() => {
+    if (!slice) return []
+    const spikeFn = isDuringSpikeFor(slice.dataPoints)
+    return applyFilters(slice.messages, filterState, spikeFn)
+  }, [slice, filterState])
 
   // Re-show banner on fresh transition out of degraded state.
   useEffect(() => {
@@ -88,6 +100,15 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
         </div>
       )}
 
+      <div className="border-b border-border px-2 py-1">
+        <FilterToolbar
+          mode="multi"
+          filterState={filterState}
+          onFilterStateChange={(next) => setStreamFilter(streamLogin, next)}
+          onApplyToAllStreams={applyFilterToAllStreams}
+        />
+      </div>
+
       <div className="flex-1 min-h-0">
         {showConnectingPlaceholder ? (
           <div
@@ -107,7 +128,7 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
             </div>
           </div>
         ) : (
-          <ChatList messagesOverride={slice.messages} />
+          <ChatList messagesOverride={filteredMessages} />
         )}
       </div>
     </Card>

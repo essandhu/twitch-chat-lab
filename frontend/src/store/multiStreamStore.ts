@@ -1,8 +1,10 @@
 import { create } from 'zustand'
+import { laggedPearson, pearson } from '../features/heatmap/correlationMath'
 import type {
   ChannelChatMessageEvent,
   ChatMessage,
   EventAnnotation,
+  FilterState,
   FirstTimerEntry,
   HeatmapDataPoint,
 } from '../types/twitch'
@@ -10,6 +12,24 @@ import { buildChatMessage } from './chatMessageMapper'
 
 const MESSAGE_BUFFER_CAP = 5000
 const ROLLING_WINDOW_POINTS = 300 // 5 minutes at 1-second cadence
+const CORRELATION_WINDOW_SAMPLES = 60
+const CORRELATION_MIN_SAMPLES = 10
+const CORRELATION_MAX_LAG_SECONDS = 10
+
+export const DEFAULT_FILTER_STATE: FilterState = {
+  firstTimeOnly: false,
+  subscribersOnly: false,
+  keyword: '',
+  hypeModeOnly: false,
+}
+
+export const pairKeyFor = (a: string, b: string): string => [a, b].sort().join('|')
+
+export interface CorrelationEntry {
+  coefficient: number
+  lagMs: number
+  updatedAt: number
+}
 
 export type StreamConnectionState = 'connecting' | 'ready' | 'degraded'
 
@@ -33,6 +53,8 @@ export interface MultiStreamStoreState {
   streams: Record<string, StreamSlice>
   order: string[]
   isActive: boolean
+  filterState: Record<string, FilterState>
+  correlation: Record<string, CorrelationEntry>
 
   addStream: (
     init: Pick<StreamSlice, 'login' | 'displayName' | 'broadcasterId'> &
@@ -43,6 +65,9 @@ export interface MultiStreamStoreState {
   addAnnotation: (login: string, annotation: EventAnnotation) => void
   incrementCounter: (login: string) => void
   tickAll: () => void
+  tickCorrelation: () => void
+  setStreamFilter: (login: string, next: FilterState | Partial<FilterState>) => void
+  applyFilterToAllStreams: (state: FilterState) => void
   reset: () => void
   setActive: (active: boolean) => void
   setConnectionState: (login: string, state: StreamConnectionState) => void
@@ -73,6 +98,8 @@ export const useMultiStreamStore = create<MultiStreamStoreState>((set) => ({
   streams: {},
   order: [],
   isActive: false,
+  filterState: {},
+  correlation: {},
 
   addStream: (init) =>
     set((state) => {
@@ -82,6 +109,7 @@ export const useMultiStreamStore = create<MultiStreamStoreState>((set) => ({
       return {
         streams: { ...state.streams, [init.login]: createEmptySlice(init) },
         order: [...state.order, init.login],
+        filterState: { ...state.filterState, [init.login]: { ...DEFAULT_FILTER_STATE } },
       }
     }),
 
@@ -92,9 +120,18 @@ export const useMultiStreamStore = create<MultiStreamStoreState>((set) => ({
       }
       const nextStreams = { ...state.streams }
       delete nextStreams[login]
+      const nextFilter = { ...state.filterState }
+      delete nextFilter[login]
+      const nextCorrelation: Record<string, CorrelationEntry> = {}
+      for (const [key, value] of Object.entries(state.correlation)) {
+        const [a, b] = key.split('|')
+        if (a !== login && b !== login) nextCorrelation[key] = value
+      }
       return {
         streams: nextStreams,
         order: state.order.filter((l) => l !== login),
+        filterState: nextFilter,
+        correlation: nextCorrelation,
       }
     }),
 
@@ -206,7 +243,70 @@ export const useMultiStreamStore = create<MultiStreamStoreState>((set) => ({
       return { streams: nextStreams }
     }),
 
-  reset: () => set({ streams: {}, order: [], isActive: false }),
+  tickCorrelation: () =>
+    set((state) => {
+      const logins = state.order
+      if (logins.length < 2) return state
+      const nextCorrelation: Record<string, CorrelationEntry> = { ...state.correlation }
+      const updatedAt = Date.now()
+      for (let i = 0; i < logins.length; i++) {
+        for (let j = i + 1; j < logins.length; j++) {
+          const loginA = logins[i]
+          const loginB = logins[j]
+          const a = state.streams[loginA]
+          const b = state.streams[loginB]
+          if (!a || !b) continue
+          const seriesA = a.dataPoints
+            .slice(-CORRELATION_WINDOW_SAMPLES)
+            .map((p) => p.msgPerSec)
+          const seriesB = b.dataPoints
+            .slice(-CORRELATION_WINDOW_SAMPLES)
+            .map((p) => p.msgPerSec)
+          if (seriesA.length < CORRELATION_MIN_SAMPLES || seriesB.length < CORRELATION_MIN_SAMPLES) {
+            continue
+          }
+          const len = Math.min(seriesA.length, seriesB.length)
+          const alignedA = seriesA.slice(seriesA.length - len)
+          const alignedB = seriesB.slice(seriesB.length - len)
+          const coefficient = pearson(alignedA, alignedB)
+          const { bestLagSeconds } = laggedPearson(alignedA, alignedB, CORRELATION_MAX_LAG_SECONDS)
+          nextCorrelation[pairKeyFor(loginA, loginB)] = {
+            coefficient,
+            lagMs: bestLagSeconds * 1000,
+            updatedAt,
+          }
+        }
+      }
+      return { correlation: nextCorrelation }
+    }),
+
+  setStreamFilter: (login, next) =>
+    set((state) => {
+      const existing = state.filterState[login] ?? { ...DEFAULT_FILTER_STATE }
+      const isFull =
+        typeof (next as FilterState).firstTimeOnly === 'boolean' &&
+        typeof (next as FilterState).subscribersOnly === 'boolean' &&
+        typeof (next as FilterState).keyword === 'string' &&
+        typeof (next as FilterState).hypeModeOnly === 'boolean'
+      const merged = isFull
+        ? { ...(next as FilterState) }
+        : { ...existing, ...(next as Partial<FilterState>) }
+      return {
+        filterState: { ...state.filterState, [login]: merged },
+      }
+    }),
+
+  applyFilterToAllStreams: (nextState) =>
+    set((state) => {
+      const nextFilter: Record<string, FilterState> = {}
+      for (const login of state.order) {
+        nextFilter[login] = { ...nextState }
+      }
+      return { filterState: nextFilter }
+    }),
+
+  reset: () =>
+    set({ streams: {}, order: [], isActive: false, filterState: {}, correlation: {} }),
 
   setActive: (active) => set({ isActive: active }),
 

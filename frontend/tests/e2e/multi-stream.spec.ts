@@ -51,10 +51,11 @@ test('multi-stream: add 2 channels, see 3 columns, upstream_lost degrades one, e
   proxyHandle.pushChat('alt_one', 'hello from alt_one', 'userB')
   proxyHandle.pushChat('alt_two', 'hello from alt_two', 'userC')
 
-  // Each column should receive only its own frames.
-  await expect(page.getByText('hello from demouser')).toBeVisible()
-  await expect(page.getByText('hello from alt_one')).toBeVisible()
-  await expect(page.getByText('hello from alt_two')).toBeVisible()
+  // Each column should receive only its own frames. Scope to <main> — these
+  // messages also appear in the SpotlightFeed inside the ChatDock.
+  await expect(main.getByText('hello from demouser')).toBeVisible()
+  await expect(main.getByText('hello from alt_one')).toBeVisible()
+  await expect(main.getByText('hello from alt_two')).toBeVisible()
 
   // Trigger upstream_lost on alt_one — its column surfaces the degraded banner.
   proxyHandle.pushUpstreamLost('alt_one')
@@ -63,7 +64,7 @@ test('multi-stream: add 2 channels, see 3 columns, upstream_lost degrades one, e
 
   // Other columns keep receiving.
   proxyHandle.pushChat('alt_two', 'still alive', 'userD')
-  await expect(page.getByText('still alive')).toBeVisible()
+  await expect(main.getByText('still alive')).toBeVisible()
 
   // Exit compare — MultiStreamLayout unmounts, single-stream layout returns,
   // DELETE /session is issued.

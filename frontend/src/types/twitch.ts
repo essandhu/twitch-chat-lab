@@ -465,6 +465,8 @@ export interface FilterState {
   subscribersOnly: boolean
   keyword: string
   hypeModeOnly: boolean
+  query?: string
+  queryError?: string | null
 }
 
 export interface FirstTimerEntry {

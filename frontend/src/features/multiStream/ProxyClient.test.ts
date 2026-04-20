@@ -444,6 +444,70 @@ describe('ProxyClient', () => {
     tickSpy.mockRestore()
   })
 
+  it('invokes tickAll then tickCorrelation in order on each simulated tick', async () => {
+    vi.useFakeTimers()
+
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      if (typeof input === 'string' && input.endsWith('/session')) {
+        return new Response(JSON.stringify({ session_id: 'sess-corr' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response('', { status: 204 })
+    }) as unknown as typeof fetch
+
+    const sockets: FakeSocket[] = []
+    const createSocket = (url: string): WebSocket => {
+      const s = new FakeSocket(url)
+      sockets.push(s)
+      return s as unknown as WebSocket
+    }
+
+    const client = new ProxyClient({
+      proxyUrl: 'http://proxy.test',
+      fetchImpl,
+      createSocket,
+    })
+
+    const { sessionId } = await client.createSession({
+      channels: [{ login: 'alice', displayName: 'Alice', broadcasterId: 'b_alice' }],
+      userId: 'u1',
+      accessToken: 'tok',
+    })
+
+    const connectPromise = client.connect(sessionId)
+    await flushMicrotasks()
+    sockets[0]!.emitOpen()
+    await connectPromise
+
+    const order: string[] = []
+    const originalTickAll = useMultiStreamStore.getState().tickAll
+    const originalTickCorr = useMultiStreamStore.getState().tickCorrelation
+    const tickAllWrap = vi.fn(() => {
+      order.push('tickAll')
+      originalTickAll()
+    })
+    const tickCorrWrap = vi.fn(() => {
+      order.push('tickCorrelation')
+      originalTickCorr()
+    })
+    useMultiStreamStore.setState({ tickAll: tickAllWrap, tickCorrelation: tickCorrWrap })
+
+    vi.advanceTimersByTime(1000)
+
+    expect(tickAllWrap).toHaveBeenCalledTimes(1)
+    expect(tickCorrWrap).toHaveBeenCalledTimes(1)
+    expect(order).toEqual(['tickAll', 'tickCorrelation'])
+
+    vi.advanceTimersByTime(1000)
+    expect(tickAllWrap).toHaveBeenCalledTimes(2)
+    expect(tickCorrWrap).toHaveBeenCalledTimes(2)
+    expect(order).toEqual(['tickAll', 'tickCorrelation', 'tickAll', 'tickCorrelation'])
+
+    await client.disconnect()
+  })
+
   it('never leaks the access token into logs during createSession', async () => {
     const logger = {
       debug: vi.fn(),

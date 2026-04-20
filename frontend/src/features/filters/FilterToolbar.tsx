@@ -1,8 +1,8 @@
-import { useChatStore } from '../../store/chatStore'
 import type { FilterState } from '../../types/twitch'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { cn } from '../../lib/cn'
+import { FilterPresetsMenu } from './FilterPresetsMenu'
 import { KeywordFilter } from './KeywordFilter'
 import { countActiveFilters } from './filterLogic'
 
@@ -37,10 +37,23 @@ const TOGGLES: ReadonlyArray<{ flag: ToggleFlag; label: string }> = [
   { flag: 'hypeModeOnly', label: 'Hype Mode' },
 ]
 
-export const FilterToolbar = () => {
-  const filterState = useChatStore((s) => s.filterState)
-  const setFilterState = useChatStore((s) => s.setFilterState)
+export interface FilterToolbarProps {
+  filterState: FilterState
+  onFilterStateChange: (next: FilterState) => void
+  onApplyToAllStreams?: (state: FilterState) => void
+  mode?: 'single' | 'multi'
+}
+
+export const FilterToolbar = ({
+  filterState,
+  onFilterStateChange,
+  onApplyToAllStreams,
+  mode = 'single',
+}: FilterToolbarProps) => {
   const activeCount = countActiveFilters(filterState)
+
+  const toggle = (flag: ToggleFlag) =>
+    onFilterStateChange({ ...filterState, [flag]: !filterState[flag] })
 
   return (
     <div className="relative flex flex-wrap items-center gap-2">
@@ -49,10 +62,11 @@ export const FilterToolbar = () => {
           key={flag}
           label={label}
           active={filterState[flag]}
-          onToggle={() => setFilterState({ [flag]: !filterState[flag] } as Partial<FilterState>)}
+          onToggle={() => toggle(flag)}
         />
       ))}
-      <KeywordFilter />
+      <KeywordFilter filterState={filterState} onFilterStateChange={onFilterStateChange} />
+      <FilterPresetsMenu filterState={filterState} onFilterStateChange={onFilterStateChange} />
       {activeCount > 0 && (
         <Badge
           data-testid="filter-count"
@@ -61,6 +75,17 @@ export const FilterToolbar = () => {
         >
           {activeCount}
         </Badge>
+      )}
+      {mode === 'multi' && onApplyToAllStreams && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onApplyToAllStreams(filterState)}
+          className="font-mono uppercase tracking-[0.22em]"
+        >
+          Apply to all
+        </Button>
       )}
     </div>
   )

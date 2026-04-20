@@ -1,4 +1,5 @@
 import { useHeatmapData } from '../../hooks/useHeatmapData'
+import { CorrelationPanel } from './CorrelationPanel'
 import { EngagementChart } from './EngagementChart'
 import { StatCard } from './StatCard'
 
@@ -31,6 +32,11 @@ export const HeatmapPanel = () => {
       <div className="flex-1 min-h-0 p-3">
         <EngagementChart />
       </div>
+      {data.mode === 'multi' && (
+        <div className="min-h-[180px] border-t border-border p-3">
+          <CorrelationPanel />
+        </div>
+      )}
     </div>
   )
 }

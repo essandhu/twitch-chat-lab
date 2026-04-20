@@ -1,52 +1,52 @@
 import type { ChatMessage, FilterState } from '../../types/twitch'
+import type { EvalContext, FilterQuery } from './filterQuery'
+import { evaluate, parse } from './filterQuery'
 
-/**
- * Count how many filters in `state` are currently active.
- *
- * A filter is "active" when:
- *   - firstTimeOnly === true
- *   - subscribersOnly === true
- *   - keyword is a non-empty string
- *   - hypeModeOnly === true
- */
 export function countActiveFilters(state: FilterState): number {
   let n = 0
   if (state.firstTimeOnly) n++
   if (state.subscribersOnly) n++
   if (state.keyword !== '') n++
   if (state.hypeModeOnly) n++
+  if (state.query && !state.queryError) n++
   return n
 }
 
-/**
- * Pure filter application over a list of chat messages.
- *
- * Composition is logical AND across all active filters. When no filters are
- * active, returns the INPUT array reference (no copy) so downstream React
- * memoization can short-circuit via referential equality.
- *
- * `isDuringSpike` is injected — this function takes no dependency on any
- * module-level state or store.
- */
+export function desugarToggles(state: FilterState): FilterQuery | null {
+  const parts: FilterQuery[] = []
+  if (state.firstTimeOnly) parts.push({ kind: 'preset', name: 'firstTimer' })
+  if (state.subscribersOnly) parts.push({ kind: 'preset', name: 'sub' })
+  if (state.hypeModeOnly) parts.push({ kind: 'preset', name: 'hype' })
+  if (state.keyword !== '') parts.push({ kind: 'keyword', value: state.keyword })
+  if (parts.length === 0) return null
+  if (parts.length === 1) return parts[0]
+  return { kind: 'and', children: parts }
+}
+
+const compose = (a: FilterQuery | null, b: FilterQuery | null): FilterQuery | null => {
+  if (!a) return b
+  if (!b) return a
+  return { kind: 'and', children: [a, b] }
+}
+
 export function applyFilters(
   messages: ChatMessage[],
   state: FilterState,
   isDuringSpike: (ts: number) => boolean,
 ): ChatMessage[] {
-  const { firstTimeOnly, subscribersOnly, keyword, hypeModeOnly } = state
-  const keywordActive = keyword !== ''
+  const toggleAst = desugarToggles(state)
+  const rawQuery = state.query ?? ''
+  const parsed = rawQuery.trim() ? parse(rawQuery) : { query: null, error: null }
+  const composed = parsed.error ? toggleAst : compose(toggleAst, parsed.query)
 
-  if (!firstTimeOnly && !subscribersOnly && !keywordActive && !hypeModeOnly) {
-    return messages
-  }
+  if (!composed) return messages
 
-  const loweredKeyword = keywordActive ? keyword.toLowerCase() : ''
-
-  return messages.filter((message) => {
-    if (firstTimeOnly && !message.isFirstInSession) return false
-    if (subscribersOnly && !message.badges.some((b) => b.setId === 'subscriber')) return false
-    if (keywordActive && !message.text.toLowerCase().includes(loweredKeyword)) return false
-    if (hypeModeOnly && !isDuringSpike(message.timestamp.getTime())) return false
-    return true
+  const ctx: EvalContext = { isDuringSpike }
+  return messages.filter((m) => {
+    try {
+      return evaluate(m, composed, ctx)
+    } catch {
+      return false
+    }
   })
 }
