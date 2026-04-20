@@ -37,6 +37,16 @@ const maxChannelsPerSession = 3
 // single orphan does not visibly delay the next demo visitor.
 const orphanSessionTimeout = 30 * time.Second
 
+// postFailureDrainGrace is the drain window used when handlePostSession's
+// subscribe loop fails partway through. The default pool drain (30s) is
+// too long — it would hold Twitch WS transport slots past the user's
+// immediate retry and into their single-stream EventSub reconnect,
+// producing the 429/502 cascade described in the multi-stream issue.
+// 2s is long enough to cover a human click-to-retry (Subscribe joins
+// the still-warm pool and cancels the timer) and short enough that the
+// single-stream reconnect a beat later has a clean transport budget.
+const postFailureDrainGrace = 2 * time.Second
+
 // SessionHandlerDeps bundles everything RegisterSessionRoutes needs to mount
 // POST /session and DELETE /session/:id. The Subscribe seam lets tests
 // inject a fake upstream hub; in production Hub is wired by main.
@@ -69,6 +79,14 @@ type SessionHandlerDeps struct {
 	// Hub.ReleaseIdlePool when Hub is set and this seam is nil. Nil is
 	// tolerated in tests that don't care.
 	ReleaseIdlePool func(streamLogin, userID string)
+
+	// CompressDrain is called by POST /session teardown on partial failure
+	// to shorten the drain grace so transport slots free fast enough for
+	// an immediate retry. Unlike ReleaseIdlePool (which is a strict
+	// release), this keeps the pool warm for ~grace, so a retry within
+	// that window joins the existing pool instead of rebuilding it.
+	// Defaults to Hub.CompressDrain when Hub is set and this seam is nil.
+	CompressDrain func(streamLogin, userID string, grace time.Duration)
 
 	// OrphanTimeout overrides orphanSessionTimeout. Zero falls back to the
 	// package default.
@@ -131,6 +149,12 @@ func RegisterSessionRoutes(r gin.IRouter, deps SessionHandlerDeps) {
 		hub := deps.Hub
 		deps.ReleaseIdlePool = func(streamLogin, userID string) {
 			hub.ReleaseIdlePool(streamLogin, userID)
+		}
+	}
+	if deps.CompressDrain == nil && deps.Hub != nil {
+		hub := deps.Hub
+		deps.CompressDrain = func(streamLogin, userID string, grace time.Duration) {
+			hub.CompressDrain(streamLogin, userID, grace)
 		}
 	}
 	if deps.OrphanTimeout <= 0 {
@@ -241,6 +265,17 @@ func handlePostSession(c *gin.Context, deps SessionHandlerDeps) {
 		for _, a := range attachedList {
 			_ = a.conn.Close()
 		}
+		// Close drops the refcount and the pool starts its default 30s
+		// drain — too long for the failure path. Compress to a short
+		// window instead: an immediate retry joins the still-warm pool
+		// (no upstream rebuild), and if the client walks away the slots
+		// free quickly enough that the single-stream EventSub reconnect
+		// doesn't hit Twitch's per-user transport cap.
+		if deps.CompressDrain != nil {
+			for _, a := range attachedList {
+				deps.CompressDrain(a.streamLogin, req.UserID, postFailureDrainGrace)
+			}
+		}
 	}
 
 	for _, login := range req.Channels {
@@ -318,8 +353,24 @@ func handlePostSession(c *gin.Context, deps SessionHandlerDeps) {
 	// the /ws handler cancels this timer atomically.
 	registry := deps.Registry
 	logger := deps.Logger
+	releaseIdlePool := deps.ReleaseIdlePool
 	sess.StartOrphanTimer(deps.OrphanTimeout, func() {
+		// Snapshot at fire time (not arm time) so a PATCH that added
+		// or removed channels during the orphan window is reflected.
+		// Stop doesn't mutate StreamLogins/UserID, so reading them
+		// before Remove is safe and matches handleDeleteSession.
+		logins := append([]string(nil), sess.StreamLogins...)
+		userID := sess.UserID
 		registry.Remove(sessionID)
+		// Orphaned = client definitively gone (never attached /ws).
+		// Strict release — the grace's "maybe they're reloading"
+		// premise doesn't apply, and we want the transport slots back
+		// for the next visitor.
+		if releaseIdlePool != nil {
+			for _, login := range logins {
+				releaseIdlePool(login, userID)
+			}
+		}
 		if logger != nil {
 			logger.Warn("session.orphaned",
 				"sessionId", sessionID,
