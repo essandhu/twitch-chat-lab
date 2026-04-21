@@ -2,6 +2,7 @@ import { logger as defaultLogger, setGlobalCorrelationId } from '../../lib/logge
 import { annotationFromEvent } from '../../services/annotationFromEvent'
 import { recordLatencySample } from '../../services/EventSubLatencyChannel'
 import { useIntelligenceStore } from '../../store/intelligenceStore'
+import { useSemanticStore } from '../../store/semanticStore'
 import { useMultiStreamStore } from '../../store/multiStreamStore'
 import type {
   ChannelChatMessageEvent,
@@ -12,6 +13,7 @@ import type {
 } from '../../types/twitch'
 
 const TICK_INTERVAL_MS = 1000
+const MOMENT_DETECT_TICKS = 5
 
 type Logger = typeof defaultLogger
 
@@ -89,6 +91,7 @@ export class ProxyClient {
   private ws: WebSocket | null = null
   private sessionId: string | null = null
   private tickTimer: ReturnType<typeof setInterval> | null = null
+  private tickCounter = 0
 
   constructor(deps: ProxyClientDeps) {
     this.proxyUrl = deps.proxyUrl
@@ -236,6 +239,7 @@ export class ProxyClient {
 
   private startTick(): void {
     if (this.tickTimer) clearInterval(this.tickTimer)
+    this.tickCounter = 0
     this.tickTimer = setInterval(() => {
       const store = useMultiStreamStore.getState()
       store.tickAll()
@@ -243,6 +247,8 @@ export class ProxyClient {
       const intelligence = useIntelligenceStore.getState()
       const now = Date.now()
       for (const login of Object.keys(store.streams)) intelligence.tick(now, login)
+      this.tickCounter = (this.tickCounter + 1) % MOMENT_DETECT_TICKS
+      if (this.tickCounter === 0) useSemanticStore.getState().detectMoments(now)
     }, TICK_INTERVAL_MS)
   }
 
@@ -308,6 +314,9 @@ export class ProxyClient {
           login: slice.login,
           displayName: slice.displayName,
         })
+        if (useSemanticStore.getState().status === 'ready') {
+          useSemanticStore.getState().ingestMessage(built, envelope.stream_login, built.timestamp.getTime())
+        }
       }
       return
     }

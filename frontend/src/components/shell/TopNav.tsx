@@ -9,6 +9,10 @@ import type { ResolvedTheme, ThemeChoice } from '../ThemeProvider'
 import { twitchAuthService } from '../../features/auth/authServices'
 import { isDemoMode } from '../../services/DemoModeService'
 import { PENDING_CHANNEL_KEY } from '../../features/auth/ConnectForm'
+import { SemanticStatusChip } from './SemanticStatusChip'
+import { Tooltip } from '../ui/Tooltip'
+
+const SEMANTIC_DISCLOSURE = 'Embeddings run locally; no chat content leaves your browser.'
 
 // --- Icons (inline 16x16 SVGs; stroke-based, use currentColor) -----------
 const Svg = ({ children }: { children: ReactNode }) => (
@@ -129,6 +133,18 @@ export const TopNav = ({ leadingRailTrigger }: TopNavProps = {}) => {
           twitch · chat · lab
         </span>
       </button>
+
+      <SemanticStatusChip />
+      <Tooltip content={<span className="max-w-xs font-mono text-[11px]">{SEMANTIC_DISCLOSURE}</span>} side="bottom">
+        <button
+          type="button"
+          data-testid="semantic-info-tooltip"
+          aria-label="About semantic search"
+          className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-border/60 font-mono text-[9px] text-text-muted hover:text-text focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+        >
+          i
+        </button>
+      </Tooltip>
 
       {/* Center: search */}
       <div className="flex-1 flex justify-center">

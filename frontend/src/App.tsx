@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useChatStore } from './store/chatStore'
 import { useMultiStreamStore } from './store/multiStreamStore'
 import { usePerfStore } from './store/perfStore'
+import { useSemanticStore } from './store/semanticStore'
 import { AuthCallback } from './features/auth/AuthCallback'
 import { ConnectForm } from './features/auth/ConnectForm'
 import { twitchAuthService } from './features/auth/authServices'
@@ -182,6 +183,16 @@ export const LandingView = () => {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  const semanticBootedRef = useRef(false)
+  useEffect(() => {
+    if (semanticBootedRef.current) return
+    semanticBootedRef.current = true
+    if (new URLSearchParams(window.location.search).get('semantic') === '0') return
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number }
+    const schedule = w.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 500))
+    schedule(() => void useSemanticStore.getState().activate(), { timeout: 2000 })
   }, [])
 
   const urlFilterAppliedRef = useRef(false)

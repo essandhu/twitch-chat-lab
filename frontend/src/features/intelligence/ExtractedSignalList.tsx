@@ -2,6 +2,8 @@ import { useContext, useMemo } from 'react'
 import { logger } from '../../lib/logger'
 import type { ChatMessage, ExtractedSignalKind, ExtractedSignalRef } from '../../types/twitch'
 import { ChatScrollContext } from '../chat/chatScrollContext'
+import { PRIMARY_STREAM_KEY, useIntelligenceStore } from '../../store/intelligenceStore'
+import { AccountAgeBadge } from './AccountAgeBadge'
 
 interface Props {
   kind: ExtractedSignalKind
@@ -12,11 +14,10 @@ interface Props {
 }
 
 const MAX_ROWS = 50
-
-const emptyMessage = (kind: ExtractedSignalKind): string => {
-  if (kind === 'question') return 'No questions yet'
-  if (kind === 'callout') return 'No callouts yet'
-  return 'No bits messages yet'
+const EMPTY: Record<ExtractedSignalKind, string> = {
+  question: 'No questions yet',
+  callout: 'No callouts yet',
+  bitsContext: 'No bits messages yet',
 }
 
 let warned = false
@@ -24,14 +25,14 @@ let warned = false
 export function ExtractedSignalList({ kind, refs, resolve, canScroll, streamLogin }: Props): JSX.Element {
   const scrollTo = useContext(ChatScrollContext)
   const rows = useMemo(() => refs.slice(-MAX_ROWS).reverse(), [refs])
+  const accountAgeByUser = useIntelligenceStore(
+    (s) => s.slices[streamLogin ?? PRIMARY_STREAM_KEY]?.accountAge ?? {},
+  )
 
   if (rows.length === 0) {
     return (
-      <div
-        className="flex h-full items-center justify-center p-6 text-center text-xs text-text-muted"
-        data-testid={`intelligence-empty-${kind}`}
-      >
-        {emptyMessage(kind)}
+      <div className="flex h-full items-center justify-center p-6 text-center text-xs text-text-muted" data-testid={`intelligence-empty-${kind}`}>
+        {EMPTY[kind]}
       </div>
     )
   }
@@ -51,28 +52,20 @@ export function ExtractedSignalList({ kind, refs, resolve, canScroll, streamLogi
     <ul className="flex flex-col divide-y divide-border/60">
       {rows.map((ref) => {
         const msg = resolve(ref.messageId)
-        const preview = msg ? msg.text : '(message evicted)'
+        const age = msg ? accountAgeByUser[msg.userId] : undefined
         return (
-          <li
-            key={ref.messageId}
-            data-testid="intelligence-row"
-            data-kind={kind}
-            data-message-id={ref.messageId}
-          >
-            <button
-              type="button"
-              onClick={() => handleClick(ref.messageId)}
-              className="flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-surface-hover focus:outline-none focus-visible:bg-surface-hover"
-            >
+          <li key={ref.messageId} data-testid="intelligence-row" data-kind={kind} data-message-id={ref.messageId}>
+            <button type="button" onClick={() => handleClick(ref.messageId)} className="flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-surface-hover focus:outline-none focus-visible:bg-surface-hover">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="truncate font-mono text-[11px] text-text-muted">
+                <span className="flex items-baseline truncate font-mono text-[11px] text-text-muted">
                   {msg?.displayName ?? '?'}
+                  {age ? <AccountAgeBadge source={age.source} bucket={age.bucket} /> : null}
                 </span>
                 <span className="shrink-0 font-mono text-[10px] tabular-nums text-text-muted">
                   {new Date(ref.timestamp).toLocaleTimeString()}
                 </span>
               </div>
-              <span className="truncate text-sm text-text">{preview}</span>
+              <span className="truncate text-sm text-text">{msg ? msg.text : '(message evicted)'}</span>
             </button>
           </li>
         )

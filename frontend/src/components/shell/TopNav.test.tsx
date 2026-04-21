@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ThemeProvider } from '../ThemeProvider'
 import { useTheme } from '../../hooks/useTheme'
 import { PENDING_CHANNEL_KEY } from '../../features/auth/ConnectForm'
+import { TooltipProvider } from '../ui/Tooltip'
 
 vi.mock('../../features/auth/authServices', () => ({
   twitchAuthService: {
@@ -56,10 +57,12 @@ const renderNav = (extra?: React.ReactNode, initialEntries: string[] = ['/somewh
   render(
     <MemoryRouter initialEntries={initialEntries}>
       <ThemeProvider>
-        <TopNav />
-        <LocationProbe />
-        <ThemeProbe />
-        {extra}
+        <TooltipProvider delayDuration={0}>
+          <TopNav />
+          <LocationProbe />
+          <ThemeProbe />
+          {extra}
+        </TooltipProvider>
       </ThemeProvider>
     </MemoryRouter>,
   )

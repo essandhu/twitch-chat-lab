@@ -9,6 +9,8 @@ import { applyFilters } from '../filters/filterLogic'
 import { isDuringSpikeFor } from './derivedIsDuringSpike'
 import { useIntelligenceStore } from '../../store/intelligenceStore'
 import { RaidRiskChip } from '../intelligence/RaidRiskChip'
+import { SemanticActivationDialog } from '../semantic/SemanticActivationDialog'
+import { useSemanticStore } from '../../store/semanticStore'
 
 interface MultiStreamChatColumnProps {
   streamLogin: string
@@ -20,6 +22,12 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
   const setStreamFilter = useMultiStreamStore((s) => s.setStreamFilter)
   const applyFilterToAllStreams = useMultiStreamStore((s) => s.applyFilterToAllStreams)
   const [bannerDismissed, setBannerDismissed] = useState(false)
+  const [semanticDialogOpen, setSemanticDialogOpen] = useState(false)
+  const semanticOn = useSemanticStore(
+    (s) => s.activationByStream[streamLogin] === true,
+  )
+  const order = useMultiStreamStore((s) => s.order)
+  const isFirstColumn = order[0] === streamLogin
 
   const filteredMessages = useMemo(() => {
     if (!slice) return []
@@ -77,6 +85,30 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
             {slice.displayName}
           </span>
           <RaidRiskChip streamLogin={streamLogin} compact />
+          <button
+            type="button"
+            onClick={() => {
+              if (semanticOn) {
+                useSemanticStore.setState((s) => ({
+                  activationByStream: { ...s.activationByStream, [streamLogin]: false },
+                }))
+                return
+              }
+              if (isFirstColumn) {
+                void useSemanticStore.getState().activate(streamLogin)
+                return
+              }
+              setSemanticDialogOpen(true)
+            }}
+            data-testid="semantic-column-toggle"
+            data-state={semanticOn ? 'on' : 'off'}
+            aria-label={semanticOn ? 'Disable semantic search for this stream' : 'Enable semantic search for this stream'}
+            className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded-sm border border-border/60 transition hover:bg-surface-hover ${semanticOn ? 'text-accent' : 'text-text-muted'}`}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill={semanticOn ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" />
+            </svg>
+          </button>
         </div>
         <IconButton
           size="sm"
@@ -136,6 +168,12 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
           <ChatList messagesOverride={filteredMessages} />
         )}
       </div>
+      <SemanticActivationDialog
+        open={semanticDialogOpen}
+        onOpenChange={setSemanticDialogOpen}
+        streamLogin={streamLogin}
+        displayName={slice.displayName}
+      />
     </Card>
   )
 }

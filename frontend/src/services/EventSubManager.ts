@@ -3,6 +3,7 @@ import { buildPinnedMessage, buildSystemEvent } from '../store/chatMessageMapper
 import { useChatStore } from '../store/chatStore'
 import { useHeatmapStore } from '../store/heatmapStore'
 import { useIntelligenceStore } from '../store/intelligenceStore'
+import { useSemanticStore } from '../store/semanticStore'
 import type {
   ChannelChatClearEvent,
   ChannelChatClearUserMessagesEvent,
@@ -21,6 +22,7 @@ import { HelixError } from './TwitchHelixClient'
 
 const EVENTSUB_WS_URL = 'wss://eventsub.wss.twitch.tv/ws'
 const TICK_INTERVAL_MS = 1000
+const MOMENT_DETECT_TICKS = 5
 
 export interface EventSubConnectArgs {
   broadcasterId: string
@@ -91,6 +93,7 @@ export class EventSubManager {
   private helix: TwitchHelixClient
   private ws: WebSocket | null = null
   private tickTimer: ReturnType<typeof setInterval> | null = null
+  private tickCounter = 0
   private sessionId: string | null = null
   private correlationId: string | null = null
   private args: EventSubConnectArgs | null = null
@@ -168,9 +171,13 @@ export class EventSubManager {
 
   private startHeatmapTick(): void {
     if (this.tickTimer) clearInterval(this.tickTimer)
+    this.tickCounter = 0
     this.tickTimer = setInterval(() => {
+      const now = Date.now()
       useHeatmapStore.getState().tick()
-      useIntelligenceStore.getState().tick(Date.now())
+      useIntelligenceStore.getState().tick(now)
+      this.tickCounter = (this.tickCounter + 1) % MOMENT_DETECT_TICKS
+      if (this.tickCounter === 0) useSemanticStore.getState().detectMoments(now)
     }, TICK_INTERVAL_MS)
   }
 
@@ -239,6 +246,9 @@ export class EventSubManager {
           })
         } else {
           logger.warn('intelligence.ingest.no_session', { messageId: event.message_id })
+        }
+        if (useSemanticStore.getState().status === 'ready') {
+          useSemanticStore.getState().ingestMessage(built, undefined, built.timestamp.getTime())
         }
       }
       return
