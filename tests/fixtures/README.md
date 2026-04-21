@@ -36,3 +36,12 @@ Replayers walk frames in order; dispatch `payload.event` keyed on `streamLogin` 
 ## Generators
 
 `phase-8-recording.jsonl` is synthetic — frames are generated rather than recorded. The source-of-truth generator is intentionally kept in version control so Phase 9/10 can generate their own fixtures with the same shape; Phase 11 swaps in the live Recorder.
+
+`phase-10-recording.jsonl` is also synthetic (seeded from `sha256('phase-10-seed')`). Single-stream 90-second session. Triggered moments:
+
+- `t = 0–60 s` — baseline chat at 1 msg/s (sets `heatmap.rollingAverage30s` ≈ 1).
+- `t = 60–75 s` — 30 messages from a `boss fight` vocabulary cluster (drives `detectMoments.semantic-cluster`).
+- `t = 75–85 s` — 60-message noise burst at 6 msg/s (well above 2× baseline, drives `detectMoments.spike`).
+- `t = 85–90 s` — decay back to baseline.
+
+Regenerate with `node tests/fixtures/generate-phase-10-recording.mjs`.
