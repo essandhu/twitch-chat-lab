@@ -43,7 +43,14 @@ for (const vp of VIEWPORTS) {
           }
         }, theme)
 
-        await openDemo(page, eventSub)
+        // Force semantic activation off so SemanticStatusChip stays hidden
+        // (idle → renders null). Without this the chip's loading → ready →
+        // compact state transition shifts top-nav width by ~14 px mid-run
+        // and produces flaky "image dimensions differ" failures.
+        await page.goto('/?demo=playwright&semantic=0')
+        // Then let the fixtures' EventSub route wire up via the existing
+        // openDemo helper (it only reuses the already-opened page).
+        await eventSub
 
         // Belt-and-braces wait: the AppShell first-mount stagger is 800ms
         // (see AppShell.tsx). reducedMotion should suppress any CSS
