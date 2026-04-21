@@ -24,7 +24,7 @@ const INITIAL_FILTER_STATE: FilterState = {
 let rowIdSequence = 0
 const nextRowId = (prefix: string): string => {
   rowIdSequence += 1
-  return `${prefix}_${rowIdSequence}_${Date.now().toString(36)}`
+  return `${prefix}_${rowIdSequence}`
 }
 
 interface ChatStoreState {

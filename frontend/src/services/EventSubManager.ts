@@ -174,7 +174,7 @@ export class EventSubManager {
     this.tickCounter = 0
     this.tickTimer = setInterval(() => {
       const now = Date.now()
-      useHeatmapStore.getState().tick()
+      useHeatmapStore.getState().tick(now)
       useIntelligenceStore.getState().tick(now)
       this.tickCounter = (this.tickCounter + 1) % MOMENT_DETECT_TICKS
       if (this.tickCounter === 0) useSemanticStore.getState().detectMoments(now)

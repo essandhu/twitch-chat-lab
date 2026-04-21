@@ -241,11 +241,11 @@ export class ProxyClient {
     if (this.tickTimer) clearInterval(this.tickTimer)
     this.tickCounter = 0
     this.tickTimer = setInterval(() => {
-      const store = useMultiStreamStore.getState()
-      store.tickAll()
-      store.tickCorrelation()
-      const intelligence = useIntelligenceStore.getState()
       const now = Date.now()
+      const store = useMultiStreamStore.getState()
+      store.tickAll(now)
+      store.tickCorrelation(now)
+      const intelligence = useIntelligenceStore.getState()
       for (const login of Object.keys(store.streams)) intelligence.tick(now, login)
       this.tickCounter = (this.tickCounter + 1) % MOMENT_DETECT_TICKS
       if (this.tickCounter === 0) useSemanticStore.getState().detectMoments(now)

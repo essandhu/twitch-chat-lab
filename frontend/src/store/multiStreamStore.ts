@@ -64,8 +64,8 @@ export interface MultiStreamStoreState {
   addMessage: (login: string, raw: ChannelChatMessageEvent) => void
   addAnnotation: (login: string, annotation: EventAnnotation) => void
   incrementCounter: (login: string) => void
-  tickAll: () => void
-  tickCorrelation: () => void
+  tickAll: (now: number) => void
+  tickCorrelation: (now: number) => void
   setStreamFilter: (login: string, next: FilterState | Partial<FilterState>) => void
   applyFilterToAllStreams: (state: FilterState) => void
   reset: () => void
@@ -214,9 +214,9 @@ export const useMultiStreamStore = create<MultiStreamStoreState>((set) => ({
       }
     }),
 
-  tickAll: () =>
+  tickAll: (now) =>
     set((state) => {
-      const timestamp = Math.round(Date.now() / 1000) * 1000
+      const timestamp = Math.round(now / 1000) * 1000
       const nextStreams: Record<string, StreamSlice> = {}
 
       for (const login of Object.keys(state.streams)) {
@@ -243,12 +243,12 @@ export const useMultiStreamStore = create<MultiStreamStoreState>((set) => ({
       return { streams: nextStreams }
     }),
 
-  tickCorrelation: () =>
+  tickCorrelation: (now) =>
     set((state) => {
       const logins = state.order
       if (logins.length < 2) return state
       const nextCorrelation: Record<string, CorrelationEntry> = { ...state.correlation }
-      const updatedAt = Date.now()
+      const updatedAt = now
       for (let i = 0; i < logins.length; i++) {
         for (let j = i + 1; j < logins.length; j++) {
           const loginA = logins[i]
