@@ -127,6 +127,7 @@ describe('startDemoSession', () => {
 
     expect(eventSubMock.connect).toHaveBeenCalledWith({
       broadcasterId: 'b-demo',
+      broadcasterLogin: 'demouser',
       userId: 'u-99',
       token: 'demo-token',
     })
