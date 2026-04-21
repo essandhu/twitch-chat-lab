@@ -60,6 +60,20 @@ export const enterReplayMode = async (source: Blob | File): Promise<void> => {
   const info = await sessionReplayer.load(source)
   // Replace onReset on the singleton to wire backwards-seek store clearing.
   ;(sessionReplayer as unknown as { onReset: (() => void) | null }).onReset = resetReplayStores
+
+  // Expose test hooks for Playwright E2E (replay.spec.ts P11-19). Dev-only
+  // scaffolding — production builds exclude the ?replay path gate, so this
+  // binding is unreachable outside replay mode.
+  if (typeof window !== 'undefined') {
+    ;(window as unknown as { __sessionReplayer?: unknown }).__sessionReplayer = sessionReplayer
+    ;(window as unknown as { __stores?: unknown }).__stores = {
+      chatStore: useChatStore,
+      heatmapStore: useHeatmapStore,
+      intelligenceStore: useIntelligenceStore,
+      semanticStore: useSemanticStore,
+      multiStreamStore: useMultiStreamStore,
+    }
+  }
   const text = await source.slice(0).text()
   const frames: RecordedFrame[] = []
   const lines = text.split('\n')
