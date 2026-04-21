@@ -88,7 +88,7 @@ describe('multiStreamStore filterState', () => {
     setSeries('alice', Array.from({ length: 30 }, (_, i) => (i % 2 === 0 ? 1 : 0)))
     setSeries('bob', Array.from({ length: 30 }, (_, i) => (i % 2 === 0 ? 2 : 0)))
     setSeries('carol', Array.from({ length: 30 }, (_, i) => (i % 2 === 0 ? 3 : 0)))
-    useMultiStreamStore.getState().tickCorrelation()
+    useMultiStreamStore.getState().tickCorrelation(Date.now())
     const before = Object.keys(useMultiStreamStore.getState().correlation)
     expect(before).toContain(pairKeyFor('alice', 'bob'))
     expect(before).toContain(pairKeyFor('alice', 'carol'))
@@ -103,7 +103,7 @@ describe('multiStreamStore filterState', () => {
     seed('alice')
     setSeries('alice', Array.from({ length: 30 }, (_, i) => Math.sin(i)))
     setSeries('bob', Array.from({ length: 30 }, (_, i) => Math.sin(i)))
-    useMultiStreamStore.getState().tickCorrelation()
+    useMultiStreamStore.getState().tickCorrelation(Date.now())
     const entry = useMultiStreamStore.getState().correlation[pairKeyFor('alice', 'bob')]
     expect(entry).toBeDefined()
     expect(entry!.coefficient).toBeCloseTo(1, 3)
@@ -114,7 +114,7 @@ describe('multiStreamStore filterState', () => {
     seed('bob')
     setSeries('alice', [1, 2, 3, 4]) // < 10
     setSeries('bob', Array.from({ length: 30 }, (_, i) => i))
-    useMultiStreamStore.getState().tickCorrelation()
+    useMultiStreamStore.getState().tickCorrelation(Date.now())
     expect(useMultiStreamStore.getState().correlation[pairKeyFor('alice', 'bob')]).toBeUndefined()
   })
 
@@ -123,7 +123,7 @@ describe('multiStreamStore filterState', () => {
     seed('bob')
     setSeries('alice', Array.from({ length: 30 }, (_, i) => i))
     setSeries('bob', Array.from({ length: 30 }, (_, i) => i))
-    useMultiStreamStore.getState().tickCorrelation()
+    useMultiStreamStore.getState().tickCorrelation(Date.now())
     useMultiStreamStore.getState().reset()
     const state = useMultiStreamStore.getState()
     expect(state.filterState).toEqual({})

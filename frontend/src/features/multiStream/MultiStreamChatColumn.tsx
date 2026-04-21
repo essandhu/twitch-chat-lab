@@ -67,8 +67,8 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
 
   return (
     <Card className="relative flex h-full min-h-0 flex-col rounded-none">
-      <Card.Header className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
+      <Card.Header className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <Avatar.Root className="h-6 w-6 flex-shrink-0">
             {slice.profileImageUrl ? (
               <Avatar.Image src={slice.profileImageUrl} alt={slice.displayName} />
@@ -81,10 +81,12 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
             aria-hidden="true"
             className={`inline-block h-2 w-2 rounded-full flex-shrink-0 ${statusDotClass}`}
           />
-          <span className="font-semibold text-sm text-text truncate">
+          <span className="font-semibold text-sm text-text truncate min-w-[2rem] flex-1">
             {slice.displayName}
           </span>
-          <RaidRiskChip streamLogin={streamLogin} compact />
+          <div className="flex-shrink-0">
+            <RaidRiskChip streamLogin={streamLogin} compact />
+          </div>
           <button
             type="button"
             onClick={() => {
@@ -103,7 +105,7 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
             data-testid="semantic-column-toggle"
             data-state={semanticOn ? 'on' : 'off'}
             aria-label={semanticOn ? 'Disable semantic search for this stream' : 'Enable semantic search for this stream'}
-            className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded-sm border border-border/60 transition hover:bg-surface-hover ${semanticOn ? 'text-accent' : 'text-text-muted'}`}
+            className={`inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-sm border border-border/60 transition hover:bg-surface-hover ${semanticOn ? 'text-accent' : 'text-text-muted'}`}
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill={semanticOn ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} strokeLinejoin="round" aria-hidden="true">
               <path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" />

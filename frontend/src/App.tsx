@@ -23,21 +23,20 @@ import { MultiStreamLayout } from './features/multiStream/MultiStreamLayout'
 import { IntelligencePanel } from './features/intelligence/IntelligencePanel'
 import { Tabs } from './components/ui/Tabs'
 import { PerfOverlay } from './features/perfPanel/PerfOverlay'
+import { StressTestPage } from './features/stress/StressTestPage'
+import { RecorderControls } from './features/record/RecorderControls'
+import { ScrubBar } from './features/record/ScrubBar'
 import { applyFilterFromUrl } from './features/filters/applyFilterFromUrl'
+import { enterReplayFromUrl, isReplayMode } from './features/record/replayBoot'
 import { getDemoConfig, isDemoMode } from './services/DemoModeService'
 import { logger } from './lib/logger'
 
+const NOTICE_CLS = 'mb-8 max-w-md border border-warning/40 bg-surface-raised p-4 font-mono text-[11px] uppercase tracking-[0.22em] text-warning'
 const DemoMisconfigNotice = () => (
-  <div className="mb-8 max-w-md border border-warning/40 bg-surface-raised p-4 font-mono text-[11px] uppercase tracking-[0.22em] text-warning">
-    Demo mode not configured — set VITE_DEMO_* in env.
-  </div>
+  <div className={NOTICE_CLS}>Demo mode not configured — set VITE_DEMO_* in env.</div>
 )
-
 const DemoUnavailableNotice = () => (
-  <div
-    role="alert"
-    className="mb-8 max-w-md border border-warning/40 bg-surface-raised p-4 font-mono text-[11px] uppercase tracking-[0.22em] text-warning"
-  >
+  <div role="alert" className={NOTICE_CLS}>
     Demo unavailable — couldn't find a live channel. Try again in a moment.
   </div>
 )
@@ -46,7 +45,8 @@ const MainPaneContent = () => {
   const session = useChatStore((s) => s.session)
   const isMultiActive = useMultiStreamStore((s) => s.isActive)
 
-  const demoMode = isDemoMode()
+  const replayMode = isReplayMode()
+  const demoMode = !replayMode && isDemoMode()
   const demoConfig = useMemo(() => (demoMode ? getDemoConfig() : null), [demoMode])
   const [demoFailed, setDemoFailed] = useState(false)
 
@@ -67,6 +67,16 @@ const MainPaneContent = () => {
     }
   }, [demoConfig])
 
+  const replayBootedRef = useRef(false)
+  useEffect(() => {
+    if (!replayMode) return
+    if (replayBootedRef.current) return
+    replayBootedRef.current = true
+    void enterReplayFromUrl().catch((err) => {
+      logger.error('replay.boot_unhandled', { error: String(err) })
+    })
+  }, [replayMode])
+
   const demoConnecting = demoMode && demoConfig !== null && !demoFailed
 
   if (!session) {
@@ -76,7 +86,14 @@ const MainPaneContent = () => {
           <DemoBanner onSignIn={() => twitchAuthService.authorize()} />
         )}
         <div className="flex min-h-full flex-1 items-center justify-center px-6 py-12">
-          {demoConnecting ? (
+          {replayMode ? (
+            <div
+              className="font-mono text-xs uppercase tracking-[0.3em] text-accent"
+              data-testid="replay-loading"
+            >
+              Loading replay…
+            </div>
+          ) : demoConnecting ? (
             <div className="font-mono text-xs uppercase tracking-[0.3em] text-accent">
               Handshaking demo session…
             </div>
@@ -133,9 +150,7 @@ const readSingleDockTab = (): string => {
 const storeSingleDockTab = (tab: string): void => {
   try {
     if (typeof localStorage !== 'undefined') localStorage.setItem(SINGLE_DOCK_TAB_KEY, tab)
-  } catch {
-    // ignore
-  }
+  } catch { /* ignore */ }
 }
 
 const ChatDockContent = () => {
@@ -213,6 +228,7 @@ export const LandingView = () => {
         rail={<LeftRail />}
         main={
           <MainPane>
+            <ScrubBar />
             <MainPaneContent />
           </MainPane>
         }
@@ -231,6 +247,9 @@ export const LandingView = () => {
       <ErrorBoundary label="Perf overlay" fallback={() => null}>
         <PerfOverlay />
       </ErrorBoundary>
+      <ErrorBoundary label="Recorder controls" fallback={() => null}>
+        <RecorderControls />
+      </ErrorBoundary>
     </>
   )
 }
@@ -240,6 +259,7 @@ export const App = () => (
     <Routes>
       <Route path="/" element={<LandingView />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/stress" element={<StressTestPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   </BrowserRouter>

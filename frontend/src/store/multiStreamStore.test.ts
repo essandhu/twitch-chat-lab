@@ -109,7 +109,7 @@ describe('multiStreamStore', () => {
     sa.incrementCounter('alice')
     sa.incrementCounter('bob')
 
-    useMultiStreamStore.getState().tickAll()
+    useMultiStreamStore.getState().tickAll(Date.now())
 
     let state = useMultiStreamStore.getState()
     expect(state.streams.alice?.dataPoints).toHaveLength(1)
@@ -126,7 +126,7 @@ describe('multiStreamStore', () => {
     // Next tick with a smaller count — peak should stay at 3 for alice
     vi.setSystemTime(new Date(base + 1000))
     useMultiStreamStore.getState().incrementCounter('alice')
-    useMultiStreamStore.getState().tickAll()
+    useMultiStreamStore.getState().tickAll(Date.now())
 
     state = useMultiStreamStore.getState()
     expect(state.streams.alice?.dataPoints).toHaveLength(2)
@@ -146,7 +146,7 @@ describe('multiStreamStore', () => {
     for (let i = 0; i < 301; i += 1) {
       vi.setSystemTime(new Date(base + i * 1000))
       useMultiStreamStore.getState().incrementCounter('alice')
-      useMultiStreamStore.getState().tickAll()
+      useMultiStreamStore.getState().tickAll(Date.now())
     }
 
     const slice = useMultiStreamStore.getState().streams.alice

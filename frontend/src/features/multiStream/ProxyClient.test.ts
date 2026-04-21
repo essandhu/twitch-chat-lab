@@ -419,7 +419,7 @@ describe('ProxyClient', () => {
     // Reach through the zustand API to also cover subsequent getState() lookups,
     // since ProxyClient calls useMultiStreamStore.getState().tickAll() at interval time.
     const originalTickAll = useMultiStreamStore.getState().tickAll
-    const tickAllWrap = vi.fn(() => originalTickAll())
+    const tickAllWrap = vi.fn((now: number) => originalTickAll(now))
     useMultiStreamStore.setState({ tickAll: tickAllWrap })
 
     vi.advanceTimersByTime(2500)
@@ -484,13 +484,13 @@ describe('ProxyClient', () => {
     const order: string[] = []
     const originalTickAll = useMultiStreamStore.getState().tickAll
     const originalTickCorr = useMultiStreamStore.getState().tickCorrelation
-    const tickAllWrap = vi.fn(() => {
+    const tickAllWrap = vi.fn((now: number) => {
       order.push('tickAll')
-      originalTickAll()
+      originalTickAll(now)
     })
-    const tickCorrWrap = vi.fn(() => {
+    const tickCorrWrap = vi.fn((now: number) => {
       order.push('tickCorrelation')
-      originalTickCorr()
+      originalTickCorr(now)
     })
     useMultiStreamStore.setState({ tickAll: tickAllWrap, tickCorrelation: tickCorrWrap })
 

@@ -20,7 +20,7 @@ describe('heatmapStore', () => {
     s.incrementCounter()
     s.incrementCounter()
     s.incrementCounter()
-    s.tick()
+    s.tick(Date.now())
 
     const { dataPoints, currentMsgPerSec } = useHeatmapStore.getState()
     expect(dataPoints).toHaveLength(1)
@@ -28,7 +28,7 @@ describe('heatmapStore', () => {
     expect(currentMsgPerSec).toBe(3)
 
     vi.setSystemTime(new Date(base + 1000))
-    useHeatmapStore.getState().tick()
+    useHeatmapStore.getState().tick(Date.now())
     const after = useHeatmapStore.getState()
     expect(after.dataPoints).toHaveLength(2)
     expect(after.dataPoints[1]?.msgPerSec).toBe(0)
@@ -40,7 +40,7 @@ describe('heatmapStore', () => {
     for (let i = 0; i < 301; i += 1) {
       vi.setSystemTime(new Date(base + i * 1000))
       s.incrementCounter()
-      s.tick()
+      s.tick(Date.now())
     }
     const { dataPoints } = useHeatmapStore.getState()
     expect(dataPoints).toHaveLength(300)
@@ -54,7 +54,7 @@ describe('heatmapStore', () => {
     counts.forEach((n, i) => {
       for (let j = 0; j < n; j += 1) s.incrementCounter()
       vi.setSystemTime(new Date(base + i * 1000))
-      s.tick()
+      s.tick(Date.now())
     })
     expect(useHeatmapStore.getState().peakMsgPerSec).toBe(9)
   })
@@ -64,7 +64,7 @@ describe('heatmapStore', () => {
     for (let i = 0; i < 30; i += 1) {
       for (let j = 0; j < 10; j += 1) s.incrementCounter()
       vi.setSystemTime(new Date(base + i * 1000))
-      s.tick()
+      s.tick(Date.now())
     }
     expect(useHeatmapStore.getState().rollingAverage30s).toBeCloseTo(10, 5)
   })
@@ -75,7 +75,7 @@ describe('heatmapStore', () => {
     counts.forEach((n, i) => {
       for (let j = 0; j < n; j += 1) s.incrementCounter()
       vi.setSystemTime(new Date(base + i * 1000))
-      s.tick()
+      s.tick(Date.now())
     })
     expect(useHeatmapStore.getState().rollingAverage30s).toBeCloseTo(3, 5)
   })
@@ -85,11 +85,11 @@ describe('heatmapStore', () => {
     for (let i = 0; i < 30; i += 1) {
       for (let j = 0; j < 10; j += 1) s.incrementCounter()
       vi.setSystemTime(new Date(base + i * 1000))
-      s.tick()
+      s.tick(Date.now())
     }
     for (let j = 0; j < 25; j += 1) s.incrementCounter()
     vi.setSystemTime(new Date(base + 30_000))
-    s.tick()
+    s.tick(Date.now())
 
     expect(useHeatmapStore.getState().isDuringSpike(base + 30_500)).toBe(true)
     expect(useHeatmapStore.getState().isDuringSpike(base + 5_000)).toBe(false)
@@ -108,10 +108,30 @@ describe('heatmapStore', () => {
     expect(useHeatmapStore.getState().annotations).toEqual([a, b])
   })
 
+  it('tick(now) is replay-pure: identical inputs produce identical dataPoints across runs', () => {
+    const run = (): typeof useHeatmapStore extends { getState: () => infer T } ? T : never => {
+      useHeatmapStore.getState().reset()
+      const s = useHeatmapStore.getState()
+      s.incrementCounter()
+      s.incrementCounter()
+      s.tick(1000)
+      s.incrementCounter()
+      s.tick(2000)
+      return useHeatmapStore.getState()
+    }
+
+    const first = run()
+    const firstSnapshot = JSON.stringify(first.dataPoints)
+    const second = run()
+    expect(JSON.stringify(second.dataPoints)).toBe(firstSnapshot)
+    expect(second.dataPoints.map((p) => p.timestamp)).toEqual([1000, 2000])
+    expect(second.dataPoints.map((p) => p.msgPerSec)).toEqual([2, 1])
+  })
+
   it('reset() clears all state', () => {
     const s = useHeatmapStore.getState()
     s.incrementCounter()
-    s.tick()
+    s.tick(Date.now())
     s.addAnnotation({ timestamp: 1, type: 'raid', label: 'x' })
     s.reset()
     const state = useHeatmapStore.getState()

@@ -623,3 +623,13 @@ export interface EmbeddingRecord {
   messageId: string
   vector: Float32Array
 }
+
+export {
+  SCHEMA_VERSION,
+  RecorderSchemaError,
+  type RecordingHeader,
+  type RecordedFrame,
+  type RecordedFrameKind,
+  type ReplaySpeed,
+  type RecorderSchemaErrorCode,
+} from './recording'

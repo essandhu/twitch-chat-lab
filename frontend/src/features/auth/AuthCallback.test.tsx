@@ -128,6 +128,7 @@ describe('AuthCallback', () => {
     expect(authMock.startValidationPolling).toHaveBeenCalled()
     expect(eventSubMock.connect).toHaveBeenCalledWith({
       broadcasterId: 'broadcaster-id',
+      broadcasterLogin: 'streamer',
       userId: 'viewer-id',
       token: 'tok',
     })

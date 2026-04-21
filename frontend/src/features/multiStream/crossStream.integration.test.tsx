@@ -211,7 +211,7 @@ describe('Cross-stream integration — 3 streams', () => {
       },
     })
 
-    store.tickCorrelation()
+    store.tickCorrelation(Date.now())
     const correlationAB = useMultiStreamStore.getState().correlation[pairKeyFor('a', 'b')]
     expect(correlationAB).toBeDefined()
     expect(correlationAB!.coefficient).toBeGreaterThan(0.5)

@@ -14,6 +14,8 @@ import type {
   EventSubNotificationPayload,
   EventSubSessionReconnectPayload,
   EventSubSessionWelcomePayload,
+  RecordedFrame,
+  RecordedFrameKind,
 } from '../types/twitch'
 import { annotationFromEvent } from './annotationFromEvent'
 import { recordLatencySample } from './EventSubLatencyChannel'
@@ -26,9 +28,12 @@ const MOMENT_DETECT_TICKS = 5
 
 export interface EventSubConnectArgs {
   broadcasterId: string
+  broadcasterLogin?: string
   userId: string
   token: string
 }
+
+export type FrameListener = (frame: RecordedFrame) => void
 
 interface SubscriptionSpec {
   type: string
@@ -98,10 +103,41 @@ export class EventSubManager {
   private correlationId: string | null = null
   private args: EventSubConnectArgs | null = null
   private createSocket: (url: string) => WebSocket
+  private frameListeners = new Set<FrameListener>()
 
   constructor(helix: TwitchHelixClient, createSocket?: (url: string) => WebSocket) {
     this.helix = helix
     this.createSocket = createSocket ?? ((url: string) => new WebSocket(url))
+  }
+
+  addFrameListener(cb: FrameListener): () => void {
+    this.frameListeners.add(cb)
+    return () => {
+      this.frameListeners.delete(cb)
+    }
+  }
+
+  dispatchFrame(frame: RecordedFrame): void {
+    const eventFrame = frame.payload as EventSubFrame
+    this.processFrame(eventFrame, { onWelcome: () => {}, suppressSubscribe: true })
+  }
+
+  private notifyFrameListeners(frame: EventSubFrame): void {
+    if (this.frameListeners.size === 0) return
+    const streamLogin = this.args?.broadcasterLogin ?? useChatStore.getState().session?.broadcasterLogin ?? ''
+    const record: RecordedFrame = {
+      t: frame.metadata.message_timestamp,
+      kind: frame.metadata.message_type as RecordedFrameKind,
+      streamLogin,
+      payload: frame,
+    }
+    for (const cb of this.frameListeners) {
+      try {
+        cb(record)
+      } catch (err) {
+        logger.warn('eventsub.frame_listener.error', { error: String(err) })
+      }
+    }
   }
 
   async connect(args: EventSubConnectArgs): Promise<void> {
@@ -174,7 +210,7 @@ export class EventSubManager {
     this.tickCounter = 0
     this.tickTimer = setInterval(() => {
       const now = Date.now()
-      useHeatmapStore.getState().tick()
+      useHeatmapStore.getState().tick(now)
       useIntelligenceStore.getState().tick(now)
       this.tickCounter = (this.tickCounter + 1) % MOMENT_DETECT_TICKS
       if (this.tickCounter === 0) useSemanticStore.getState().detectMoments(now)
@@ -183,6 +219,14 @@ export class EventSubManager {
 
   private handleFrame(data: string, callbacks: { onWelcome: () => void }): void {
     const frame = JSON.parse(data) as EventSubFrame
+    this.notifyFrameListeners(frame)
+    this.processFrame(frame, callbacks)
+  }
+
+  private processFrame(
+    frame: EventSubFrame,
+    callbacks: { onWelcome: () => void; suppressSubscribe?: boolean },
+  ): void {
     const { metadata } = frame
 
     if (metadata.message_type === 'notification' || metadata.message_type === 'session_keepalive') {
@@ -198,7 +242,7 @@ export class EventSubManager {
       this.sessionId = payload.session.id
       logger.info('eventsub.session_welcome', { sessionId: this.sessionId })
       callbacks.onWelcome()
-      void this.registerAllSubscriptions()
+      if (!callbacks.suppressSubscribe) void this.registerAllSubscriptions()
       return
     }
 
@@ -210,7 +254,7 @@ export class EventSubManager {
     if (metadata.message_type === 'session_reconnect') {
       const payload = frame.payload as EventSubSessionReconnectPayload
       logger.info('eventsub.session_reconnect', { reconnectUrl: payload.session.reconnect_url })
-      void this.reconnectTo(payload.session.reconnect_url)
+      if (!callbacks.suppressSubscribe) void this.reconnectTo(payload.session.reconnect_url)
       return
     }
 
@@ -220,7 +264,11 @@ export class EventSubManager {
     }
 
     if (metadata.message_type === 'notification') {
-      this.handleNotification(frame.payload as EventSubNotificationPayload, metadata.subscription_type)
+      this.handleNotification(
+        frame.payload as EventSubNotificationPayload,
+        metadata.subscription_type,
+        metadata.message_timestamp,
+      )
       return
     }
   }
@@ -228,6 +276,7 @@ export class EventSubManager {
   private handleNotification(
     payload: EventSubNotificationPayload,
     subscriptionType: string | undefined,
+    messageTimestamp: string,
   ): void {
     logger.debug('eventsub.notification', { subscriptionType })
 
@@ -281,8 +330,10 @@ export class EventSubManager {
 
     const annotation = subscriptionType ? annotationFromEvent(subscriptionType, payload.event) : null
     if (annotation) {
+      const parsed = Date.parse(messageTimestamp)
+      const timestamp = Number.isFinite(parsed) ? parsed : Date.now()
       useHeatmapStore.getState().addAnnotation({
-        timestamp: Date.now(),
+        timestamp,
         type: annotation.type,
         label: annotation.label,
       })

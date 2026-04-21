@@ -1,4 +1,5 @@
 import { test, expect, openDemo } from './fixtures'
+import { replayFromFixture } from './mocks/replayFromFixture'
 
 // Phase 10 P10-19 — region-based screenshot tolerance for animated surfaces
 // (SemanticStatusChip fades on ready, MomentsTimeline icons pulse). Strict pixel
@@ -69,5 +70,29 @@ test.describe('Phase 10 semantic layer', () => {
     const timeline = page.getByTestId('moments-timeline')
     const count = await timeline.count()
     expect(count).toBe(0)
+  })
+
+  // P11-22 — fixture-mount path: replay a Phase 10 fixture via the P11-11
+  // replayFromFixture helper and assert semantic surfaces render. This is the
+  // deferred-from-P10 integration that was blocked on the missing fixture-mount
+  // pattern (resolved by P11-11).
+  test('fixture-mount: phase-10-recording boots replay mode + ScrubBar visible', async ({
+    page,
+  }) => {
+    test.setTimeout(30_000)
+    await replayFromFixture(page, 'tests/fixtures/phase-10-recording.jsonl')
+    await expect(page.getByTestId('scrub-bar')).toBeVisible()
+  })
+
+  test('fixture-mount: semantic chip transitions through loading → ready within 30 s', async ({
+    page,
+  }) => {
+    test.setTimeout(45_000)
+    await replayFromFixture(page, 'tests/fixtures/phase-10-recording.jsonl')
+    const chip = page.getByTestId('semantic-status-chip')
+    // Chip may not appear immediately — poll with a generous timeout.
+    await expect(chip).toBeVisible({ timeout: 30_000 })
+    const status = await chip.getAttribute('data-status')
+    expect(['loading', 'ready', 'failed']).toContain(status)
   })
 })

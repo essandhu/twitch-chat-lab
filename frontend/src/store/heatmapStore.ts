@@ -14,7 +14,7 @@ interface HeatmapStoreState {
   _counter: number
 
   incrementCounter: () => void
-  tick: () => void
+  tick: (now: number) => void
   addAnnotation: (annotation: EventAnnotation) => void
   reset: () => void
   isDuringSpike: (timestamp: number) => boolean
@@ -49,10 +49,10 @@ export const useHeatmapStore = create<HeatmapStoreState>((set, get) => ({
 
   incrementCounter: () => set((state) => ({ _counter: state._counter + 1 })),
 
-  tick: () =>
+  tick: (now) =>
     set((state) => {
       const msgPerSec = state._counter
-      const timestamp = Math.round(Date.now() / 1000) * 1000
+      const timestamp = Math.round(now / 1000) * 1000
       const nextPoint: HeatmapDataPoint = { timestamp, msgPerSec }
 
       const appended = [...state.dataPoints, nextPoint]

@@ -47,6 +47,7 @@ export const startDemoSession = async (config: DemoConfig): Promise<void> => {
 
   await eventSubManager.connect({
     broadcasterId: broadcaster.id,
+    broadcasterLogin: broadcaster.login,
     userId: config.userId,
     token: config.token,
   })
