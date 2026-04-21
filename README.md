@@ -26,6 +26,24 @@ A client-side semantic layer runs over the live chat. On boot, the `Xenova/all-M
 - **Privacy.** **Embeddings run locally; no chat content leaves your browser.** Append `?semantic=0` to the URL to opt out at boot; a tooltip chip in the top nav mirrors the worker status (`loading` / `ready` / `off`).
 - **Multi-stream cost.** Each additional active stream adds ~20–40 MB to the embedding cache (10k vectors × 384 × 4 bytes ≈ 15 MB + overhead), surfaced in the activation dialog.
 
+## Record / Replay / Scrub
+
+Every live session can be recorded to a local `.jsonl` file and replayed later with a scrub bar.
+
+- **Record.** Press `Ctrl+Shift+R` (or `Cmd+Shift+R` on macOS) to reveal `RecorderControls`. Click Start to begin buffering EventSub frames, Stop when done, Download to save the file locally. The browser saves `tcl-session-<channel>-<iso>.jsonl`. A privacy banner confirms: recordings contain chat messages from other users; distribute locally only.
+- **Hash-broadcaster-ID toggle.** Optional. When enabled, the recorder FNV-1a-hashes `broadcaster_user_id` before writing. Chatter user IDs, logins, display names, and message text stay intact so replay fidelity is preserved. The scope is deliberately narrow — the toggle is not a general anonymizer.
+- **Replay.** Click Import in `RecorderControls` and select a `.jsonl` file, or append `?replay=<url>` to the page URL to auto-load a fixture. The app enters replay mode: live EventSub is not opened, the `ScrubBar` mounts above the heatmap, and frames dispatch through the same store-write path as live chat. Speed selector supports `0.5× / 1× / 2× / 5×`.
+- **Scrub.** Drag the thumb to jump to any position. Chat store, heatmap, intelligence chip, and Moments timeline all re-derive from the frames up to that position (stores are replay-pure — no ambient `Date.now()` reads in actions).
+- **Schema versioning.** The on-disk format is `schemaVersion: 1` (see `frontend/src/types/recording.ts`). Unknown versions surface a typed `RecorderSchemaError` on Import. Future format changes bump the constant.
+
+## Perf demo (local)
+
+`/stress` is a dev-only route for reproducible perf demonstrations. Not shipped to production — the route is guarded by `import.meta.env.DEV` and no nav component links to it.
+
+- Run locally: `cd frontend && npm run dev` → visit `http://localhost:5173/stress`.
+- Select a target rate (`100 / 500 / 1000 / 5000 msg/s`) and duration (seconds). Click Start. The synthetic chat generator (seeded mulberry32 PRNG — deterministic given a fixed seed) feeds messages into `chatStore` at the target rate.
+- The perf overlay mounts inline; `virtualizerRenderMs` p99 stays under 16 ms at 1,000 msg/s across a 10 s window on a mid-range laptop. Record the browser during the run to produce the recruiter-facing video artifact.
+
 ## What the perf panel shows
 
 | Metric | What it measures | Healthy range |
