@@ -1,5 +1,6 @@
 import { RecorderSchemaError, SCHEMA_VERSION } from '../types/recording'
 import type { RecordedFrame, RecordingHeader, ReplaySpeed } from '../types/twitch'
+import { ReplayScheduler, type ParsedFrame } from './replayScheduler'
 
 interface FrameDispatcher {
   dispatchFrame(frame: RecordedFrame): void
@@ -12,10 +13,6 @@ export interface LoadInfo {
   streamLogins: string[]
 }
 
-interface ParsedFrame extends RecordedFrame {
-  tEpoch: number
-}
-
 export interface SessionReplayerOptions {
   onReset?: () => void
 }
@@ -24,16 +21,9 @@ export class SessionReplayer {
   private manager: FrameDispatcher
   private onReset: (() => void) | null
   header: RecordingHeader | null = null
-  private frames: ParsedFrame[] = []
-  private cursor = 0
   private firstT = 0
   private duration = 0
-  private speed: ReplaySpeed = 1
-  private playing = false
-  private positionMs = 0
-  private timer: ReturnType<typeof setTimeout> | null = null
-  private playWallStart = 0
-  private playPositionBase = 0
+  private scheduler: ReplayScheduler | null = null
   private listeners = new Set<(ms: number) => void>()
 
   constructor(manager: FrameDispatcher, options: SessionReplayerOptions = {}) {
@@ -86,12 +76,18 @@ export class SessionReplayer {
     const lastT = parsed[parsed.length - 1]!.tEpoch
 
     this.header = header
-    this.frames = parsed
     this.firstT = firstT
     this.duration = lastT - firstT
-    this.cursor = 0
-    this.positionMs = 0
-    this.clearTimer()
+
+    this.scheduler?.dispose()
+    this.scheduler = new ReplayScheduler({
+      frames: parsed,
+      firstT,
+      duration: this.duration,
+      dispatcher: this.manager,
+      onReset: this.onReset,
+      onPosition: (ms) => this.notifyPosition(ms),
+    })
 
     return {
       header,
@@ -102,65 +98,23 @@ export class SessionReplayer {
   }
 
   play(): void {
-    if (this.playing) return
-    if (this.cursor >= this.frames.length) return
-    this.playing = true
-    this.playWallStart = Date.now()
-    this.playPositionBase = this.positionMs
-    this.scheduleNext()
+    this.scheduler?.play()
   }
 
   pause(): void {
-    if (!this.playing) return
-    this.updatePositionFromWall()
-    this.playing = false
-    this.clearTimer()
+    this.scheduler?.pause()
   }
 
   setSpeed(speed: ReplaySpeed): void {
-    if (this.playing) {
-      this.updatePositionFromWall()
-      this.clearTimer()
-    }
-    this.speed = speed
-    if (this.playing) {
-      this.playWallStart = Date.now()
-      this.playPositionBase = this.positionMs
-      this.scheduleNext()
-    }
+    this.scheduler?.setSpeed(speed)
   }
 
   seekTo(wallClockMs: number): void {
-    const wasPlaying = this.playing
-    if (this.playing) {
-      this.clearTimer()
-      this.playing = false
-    }
-    const target = Math.max(0, Math.min(wallClockMs, this.duration))
-    if (target < this.positionMs && this.onReset) {
-      this.onReset()
-      this.cursor = 0
-      this.positionMs = 0
-    }
-    while (this.cursor < this.frames.length) {
-      const rel = this.frames[this.cursor]!.tEpoch - this.firstT
-      if (rel > target) break
-      this.manager.dispatchFrame(this.frames[this.cursor]!)
-      this.cursor += 1
-    }
-    this.positionMs = target
-    this.notifyPosition()
-    if (wasPlaying) {
-      this.playing = true
-      this.playWallStart = Date.now()
-      this.playPositionBase = this.positionMs
-      this.scheduleNext()
-    }
+    this.scheduler?.seekTo(wallClockMs)
   }
 
   getPosition(): number {
-    if (!this.playing) return this.positionMs
-    return this.currentWallPosition()
+    return this.scheduler?.getPosition() ?? 0
   }
 
   getDuration(): number {
@@ -172,7 +126,7 @@ export class SessionReplayer {
   }
 
   isPlaying(): boolean {
-    return this.playing
+    return this.scheduler?.isPlaying() ?? false
   }
 
   onPositionChange(cb: (ms: number) => void): () => void {
@@ -183,55 +137,15 @@ export class SessionReplayer {
   }
 
   dispose(): void {
-    this.playing = false
-    this.clearTimer()
+    this.scheduler?.dispose()
+    this.scheduler = null
     this.listeners.clear()
   }
 
-  private scheduleNext(): void {
-    if (!this.playing) return
-    if (this.cursor >= this.frames.length) {
-      this.playing = false
-      this.positionMs = this.duration
-      this.notifyPosition()
-      return
-    }
-    const nextRel = this.frames[this.cursor]!.tEpoch - this.firstT
-    const currentPos = this.currentWallPosition()
-    const delay = Math.max(0, (nextRel - currentPos) / this.speed)
-    this.timer = setTimeout(() => {
-      if (!this.playing) return
-      this.manager.dispatchFrame(this.frames[this.cursor]!)
-      this.cursor += 1
-      this.positionMs = nextRel
-      this.playWallStart = Date.now()
-      this.playPositionBase = this.positionMs
-      this.notifyPosition()
-      this.scheduleNext()
-    }, delay)
-  }
-
-  private clearTimer(): void {
-    if (this.timer !== null) {
-      clearTimeout(this.timer)
-      this.timer = null
-    }
-  }
-
-  private currentWallPosition(): number {
-    if (!this.playing) return this.positionMs
-    const elapsed = (Date.now() - this.playWallStart) * this.speed
-    return this.playPositionBase + elapsed
-  }
-
-  private updatePositionFromWall(): void {
-    this.positionMs = this.currentWallPosition()
-  }
-
-  private notifyPosition(): void {
+  private notifyPosition(ms: number): void {
     for (const cb of this.listeners) {
       try {
-        cb(this.positionMs)
+        cb(ms)
       } catch {
         // swallow — position listener is presentational
       }
