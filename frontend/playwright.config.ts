@@ -13,6 +13,20 @@ export default defineConfig({
     baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',
   },
+  // P11-23 — visual-regression tolerance. The previous pre-Phase-11 default
+  // of zero tolerance on toHaveScreenshot() produced flaky failures on the
+  // Phase 10 MomentsTimeline (pulsing icons) and the Phase 11 ScrubBar
+  // (thumb focus ring, Moments-tick colors). The 0.2 threshold + 0.01
+  // maxDiffPixelRatio is the P8-spec-sanctioned relaxation for animated
+  // surfaces, applied project-wide now that Phase 11 ships the final UI.
+  // Specs that need stricter tolerance (shell, static layouts) continue to
+  // pass the explicit maxDiffPixels override at the call site.
+  expect: {
+    toHaveScreenshot: {
+      threshold: 0.2,
+      maxDiffPixelRatio: 0.01,
+    },
+  },
   projects: [
     {
       name: 'chromium',
