@@ -2,6 +2,7 @@ import { useHeatmapData } from '../../hooks/useHeatmapData'
 import { CorrelationPanel } from './CorrelationPanel'
 import { EngagementChart } from './EngagementChart'
 import { StatCard } from './StatCard'
+import { MomentsTimeline } from '../semantic/MomentsTimeline'
 
 export const HeatmapPanel = () => {
   const data = useHeatmapData()
@@ -29,6 +30,7 @@ export const HeatmapPanel = () => {
           accent="peak"
         />
       </div>
+      <MomentsTimeline />
       <div className="flex-1 min-h-0 p-3">
         <EngagementChart />
       </div>

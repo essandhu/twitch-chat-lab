@@ -598,3 +598,28 @@ export interface ExtractedSignalRef {
   kind: ExtractedSignalKind
   timestamp: number
 }
+
+// -----------------------------------------------------------------------------
+// Phase 10 — semantic layer (client-side embeddings + Moments timeline)
+// -----------------------------------------------------------------------------
+
+export type MomentKind = 'spike' | 'emote-storm' | 'qa-cluster' | 'raid' | 'semantic-cluster'
+
+export interface Moment {
+  id: string
+  kind: MomentKind
+  startedAt: Date
+  endedAt: Date
+  label: string
+  relatedMessageIds: string[]
+}
+
+export interface SemanticSearchResult {
+  messageId: string
+  score: number
+}
+
+export interface EmbeddingRecord {
+  messageId: string
+  vector: Float32Array
+}
