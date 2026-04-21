@@ -1,10 +1,10 @@
 import type { ChatMessage } from '../../types/twitch'
 import type { FilterQuery } from './filterQueryParse'
-import type { Role } from './filterQueryTokens'
+import type { RiskBand, Role } from './filterQueryTokens'
 
 export interface EvalContext {
   isDuringSpike: (ts: number) => boolean
-  riskBandFor?: (streamLogin: string) => 'calm' | 'elevated' | 'high' | 'critical'
+  riskBandFor?: () => RiskBand
 }
 
 const hasBadge = (msg: ChatMessage, setId: string): boolean =>
@@ -53,6 +53,6 @@ export const evaluate = (message: ChatMessage, query: FilterQuery, ctx: EvalCont
       return false
     case 'risk':
       if (!ctx.riskBandFor) throw new Error('risk_token_reserved_for_phase_9')
-      return false
+      return ctx.riskBandFor() === query.band
   }
 }

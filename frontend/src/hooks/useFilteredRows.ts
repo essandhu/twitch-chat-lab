@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useChatStore } from '../store/chatStore'
 import { useHeatmapStore } from '../store/heatmapStore'
 import { applyFilters } from '../features/filters/filterLogic'
+import { PRIMARY_STREAM_KEY, useIntelligenceStore } from '../store/intelligenceStore'
 import type { ChatRow } from '../types/twitch'
 
 // System, deletion, and chat-cleared rows always pass through the filter
@@ -21,9 +22,12 @@ export function useFilteredRows(): ChatRow[] {
       hasActiveQuery
     if (!hasActiveFilter) return rows
 
+    const riskBandFor = () =>
+      useIntelligenceStore.getState().slices[PRIMARY_STREAM_KEY]?.raidBand ?? 'calm'
+
     return rows.filter((row) => {
       if (row.kind !== 'message') return true
-      const kept = applyFilters([row.message], filterState, isDuringSpike)
+      const kept = applyFilters([row.message], filterState, isDuringSpike, riskBandFor)
       return kept.length > 0
     })
   }, [rows, filterState, isDuringSpike])

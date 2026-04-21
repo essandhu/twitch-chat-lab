@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Tabs } from '../../components/ui/Tabs'
+import { IntelligencePanel } from '../intelligence/IntelligencePanel'
 import { SpotlightFeed } from './SpotlightFeed'
 
 const TAB_STORAGE_KEY = 'tcl.multi-dock.tab'
@@ -34,9 +35,13 @@ export function MultiStreamChatDock(): JSX.Element {
       <Tabs.Root value={tab} onValueChange={setTab} className="flex h-full flex-col">
         <Tabs.List>
           <Tabs.Trigger value="spotlight">Spotlight</Tabs.Trigger>
+          <Tabs.Trigger value="intelligence">Intelligence</Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="spotlight" className="flex-1 min-h-0 pt-0">
           <SpotlightFeed />
+        </Tabs.Content>
+        <Tabs.Content value="intelligence" className="flex-1 min-h-0 pt-0">
+          <IntelligencePanel mode="multi" />
         </Tabs.Content>
       </Tabs.Root>
     </div>

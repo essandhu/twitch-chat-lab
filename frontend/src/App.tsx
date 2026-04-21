@@ -19,6 +19,8 @@ import { ChatPanel } from './features/chat/ChatPanel'
 import { HeatmapPanel } from './features/heatmap/HeatmapPanel'
 import { MultiStreamChatDock } from './features/multiStream/MultiStreamChatDock'
 import { MultiStreamLayout } from './features/multiStream/MultiStreamLayout'
+import { IntelligencePanel } from './features/intelligence/IntelligencePanel'
+import { Tabs } from './components/ui/Tabs'
 import { PerfOverlay } from './features/perfPanel/PerfOverlay'
 import { applyFilterFromUrl } from './features/filters/applyFilterFromUrl'
 import { getDemoConfig, isDemoMode } from './services/DemoModeService'
@@ -116,8 +118,33 @@ const MainPaneContent = () => {
   )
 }
 
+const SINGLE_DOCK_TAB_KEY = 'tcl.single-dock.tab'
+
+const readSingleDockTab = (): string => {
+  try {
+    if (typeof localStorage === 'undefined') return 'chat'
+    return localStorage.getItem(SINGLE_DOCK_TAB_KEY) ?? 'chat'
+  } catch {
+    return 'chat'
+  }
+}
+
+const storeSingleDockTab = (tab: string): void => {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(SINGLE_DOCK_TAB_KEY, tab)
+  } catch {
+    // ignore
+  }
+}
+
 const ChatDockContent = () => {
   const session = useChatStore((s) => s.session)
+  const [tab, setTab] = useState<string>(() => readSingleDockTab())
+
+  useEffect(() => {
+    storeSingleDockTab(tab)
+  }, [tab])
+
   if (!session) {
     return (
       <div className="flex h-full items-center justify-center p-6 text-center text-xs text-text-muted">
@@ -127,7 +154,18 @@ const ChatDockContent = () => {
   }
   return (
     <ErrorBoundary label="Chat">
-      <ChatPanel />
+      <Tabs.Root value={tab} onValueChange={setTab} className="flex h-full flex-col">
+        <Tabs.List>
+          <Tabs.Trigger value="chat">Chat</Tabs.Trigger>
+          <Tabs.Trigger value="intelligence">Intelligence</Tabs.Trigger>
+        </Tabs.List>
+        <Tabs.Content value="chat" className="flex-1 min-h-0 pt-0">
+          <ChatPanel />
+        </Tabs.Content>
+        <Tabs.Content value="intelligence" className="flex-1 min-h-0 pt-0">
+          <IntelligencePanel mode="single" />
+        </Tabs.Content>
+      </Tabs.Root>
     </ErrorBoundary>
   )
 }

@@ -95,6 +95,14 @@ export class TwitchHelixClient {
     return res.data[0] ?? null
   }
 
+  async getUsersByIds(userIds: string[]): Promise<HelixUser[]> {
+    if (userIds.length === 0) return []
+    if (userIds.length > 100) throw new HelixError(400, 'batch limit 100')
+    const query = userIds.map((id) => `id=${encodeURIComponent(id)}`).join('&')
+    const res = await this.request<HelixResponse<HelixUser>>(`/users?${query}`)
+    return res.data
+  }
+
   async getStream(login: string): Promise<HelixStream | null> {
     const path = `/streams?user_login=${encodeURIComponent(login)}`
     const res = await this.request<HelixResponse<HelixStream>>(path)

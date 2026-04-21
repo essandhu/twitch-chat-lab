@@ -2,6 +2,7 @@ import { Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAx
 import { useHeatmapData } from '../../hooks/useHeatmapData'
 import { tokenRgb, tokenRgba, type Token } from '../../lib/theme'
 import type { EventAnnotation, HeatmapDataPoint } from '../../types/twitch'
+import { AnomalyOverlay } from '../intelligence/AnomalyOverlay'
 
 export const formatTickMMSS = (startMs: number, ts: number): string => {
   const totalSec = Math.max(0, Math.floor((ts - startMs) / 1000))
@@ -82,6 +83,7 @@ export const EngagementChart = () => {
           dot={false}
           isAnimationActive={false}
         />
+        <AnomalyOverlay />
         {annotations.map((a) => {
           const color = annotationColor(a.type)
           return (
@@ -164,6 +166,14 @@ const MultiChart = ({ streams }: MultiChartProps) => {
             strokeWidth={2}
             dot={false}
             isAnimationActive={false}
+          />
+        ))}
+        {streams.map((s, idx) => (
+          <AnomalyOverlay
+            key={`overlay-${s.login}`}
+            streamLogin={s.login}
+            label={s.displayName}
+            stackOffset={idx}
           />
         ))}
         {annotationEntries.map((a) => {
