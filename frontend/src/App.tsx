@@ -24,6 +24,7 @@ import { IntelligencePanel } from './features/intelligence/IntelligencePanel'
 import { Tabs } from './components/ui/Tabs'
 import { PerfOverlay } from './features/perfPanel/PerfOverlay'
 import { applyFilterFromUrl } from './features/filters/applyFilterFromUrl'
+import { enterReplayFromUrl, isReplayMode } from './features/record/replayBoot'
 import { getDemoConfig, isDemoMode } from './services/DemoModeService'
 import { logger } from './lib/logger'
 
@@ -46,7 +47,8 @@ const MainPaneContent = () => {
   const session = useChatStore((s) => s.session)
   const isMultiActive = useMultiStreamStore((s) => s.isActive)
 
-  const demoMode = isDemoMode()
+  const replayMode = isReplayMode()
+  const demoMode = !replayMode && isDemoMode()
   const demoConfig = useMemo(() => (demoMode ? getDemoConfig() : null), [demoMode])
   const [demoFailed, setDemoFailed] = useState(false)
 
@@ -67,6 +69,16 @@ const MainPaneContent = () => {
     }
   }, [demoConfig])
 
+  const replayBootedRef = useRef(false)
+  useEffect(() => {
+    if (!replayMode) return
+    if (replayBootedRef.current) return
+    replayBootedRef.current = true
+    void enterReplayFromUrl().catch((err) => {
+      logger.error('replay.boot_unhandled', { error: String(err) })
+    })
+  }, [replayMode])
+
   const demoConnecting = demoMode && demoConfig !== null && !demoFailed
 
   if (!session) {
@@ -76,7 +88,14 @@ const MainPaneContent = () => {
           <DemoBanner onSignIn={() => twitchAuthService.authorize()} />
         )}
         <div className="flex min-h-full flex-1 items-center justify-center px-6 py-12">
-          {demoConnecting ? (
+          {replayMode ? (
+            <div
+              className="font-mono text-xs uppercase tracking-[0.3em] text-accent"
+              data-testid="replay-loading"
+            >
+              Loading replay…
+            </div>
+          ) : demoConnecting ? (
             <div className="font-mono text-xs uppercase tracking-[0.3em] text-accent">
               Handshaking demo session…
             </div>
