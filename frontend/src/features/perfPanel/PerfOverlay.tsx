@@ -27,6 +27,7 @@ export const PerfOverlay = () => {
       elevated
       role="complementary"
       aria-label="Performance metrics"
+      data-testid="perf-overlay"
       className="fixed bottom-4 right-4 z-[9999] w-64 backdrop-blur px-3 py-3 font-mono"
     >
       <div className="mb-2 text-[10px] uppercase tracking-[0.3em] text-text-muted">

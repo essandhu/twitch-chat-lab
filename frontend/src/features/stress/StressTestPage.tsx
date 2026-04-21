@@ -6,6 +6,7 @@ import { PerfOverlay } from '../perfPanel/PerfOverlay'
 import { Select } from '../../components/ui/Select'
 import { Button } from '../../components/ui/Button'
 import { buildSyntheticBundle } from './syntheticChatGenerator'
+import { installStoreTestHooks } from '../record/replayBoot'
 
 const RATES = [100, 500, 1000, 5000] as const
 type Rate = (typeof RATES)[number]
@@ -25,6 +26,7 @@ const StressTestPageImpl = () => {
   useEffect(() => {
     const prior = usePerfStore.getState().isVisible
     if (!prior) usePerfStore.setState({ isVisible: true })
+    installStoreTestHooks()
     return () => {
       usePerfStore.setState({ isVisible: prior })
     }
@@ -50,29 +52,32 @@ const StressTestPageImpl = () => {
 
     const chat = useChatStore.getState()
     const intel = useIntelligenceStore.getState()
-    // Batch: tick every TICK_MS ms, dispatch (rate * TICK_MS / 1000) messages per tick.
-    // Low rates (100, 500) produce sub-integer batches — accumulate via remainder.
-    let remainder = 0
+    // Time-based catchup: each tick dispatches enough messages to reach the
+    // rate * elapsed target. Under browser event-loop pressure setInterval
+    // callbacks can fire late and be coalesced — fixed per-tick batches would
+    // undershoot. Unit tests with fake timers see the same logic.
     let sentLocal = 0
     let lastSync = 0
     const durationMs = duration * 1000
     timerRef.current = setInterval(() => {
       const elapsed = Date.now() - startTimeRef.current
+      const capped = Math.min(elapsed, durationMs)
+      const target = Math.floor((rate * capped) / 1000)
+      const delta = target - sentLocal
+      if (delta > 0) {
+        const now = Date.now()
+        for (let i = 0; i < delta; i++) {
+          const { message, event } = buildSyntheticBundle(seedRef.current++, now)
+          chat.addMessage(event)
+          intel.ingestMessage(message)
+        }
+        sentLocal = target
+      }
       if (elapsed >= durationMs) {
         setSent(sentLocal)
         stop()
         return
       }
-      const exact = (rate * TICK_MS) / 1000 + remainder
-      const whole = Math.floor(exact)
-      remainder = exact - whole
-      const now = Date.now()
-      for (let i = 0; i < whole; i++) {
-        const { message, event } = buildSyntheticBundle(seedRef.current++, now)
-        chat.addMessage(event)
-        intel.ingestMessage(message)
-      }
-      sentLocal += whole
       // Throttle React state sync to ~10Hz to avoid per-tick rerender storms.
       if (elapsed - lastSync >= 100) {
         lastSync = elapsed

@@ -24,6 +24,8 @@ import { IntelligencePanel } from './features/intelligence/IntelligencePanel'
 import { Tabs } from './components/ui/Tabs'
 import { PerfOverlay } from './features/perfPanel/PerfOverlay'
 import { StressTestPage } from './features/stress/StressTestPage'
+import { RecorderControls } from './features/record/RecorderControls'
+import { ScrubBar } from './features/record/ScrubBar'
 import { applyFilterFromUrl } from './features/filters/applyFilterFromUrl'
 import { enterReplayFromUrl, isReplayMode } from './features/record/replayBoot'
 import { getDemoConfig, isDemoMode } from './services/DemoModeService'
@@ -226,6 +228,7 @@ export const LandingView = () => {
         rail={<LeftRail />}
         main={
           <MainPane>
+            <ScrubBar />
             <MainPaneContent />
           </MainPane>
         }
@@ -243,6 +246,9 @@ export const LandingView = () => {
       />
       <ErrorBoundary label="Perf overlay" fallback={() => null}>
         <PerfOverlay />
+      </ErrorBoundary>
+      <ErrorBoundary label="Recorder controls" fallback={() => null}>
+        <RecorderControls />
       </ErrorBoundary>
     </>
   )

@@ -55,6 +55,17 @@ const buildReplaySession = (frames: RecordedFrame[]): StreamSession | null => {
   return null
 }
 
+export const installStoreTestHooks = (): void => {
+  if (typeof window === 'undefined') return
+  ;(window as unknown as { __stores?: unknown }).__stores = {
+    chatStore: useChatStore,
+    heatmapStore: useHeatmapStore,
+    intelligenceStore: useIntelligenceStore,
+    semanticStore: useSemanticStore,
+    multiStreamStore: useMultiStreamStore,
+  }
+}
+
 export const enterReplayMode = async (source: Blob | File): Promise<void> => {
   resetReplayStores()
   const info = await sessionReplayer.load(source)
@@ -66,13 +77,7 @@ export const enterReplayMode = async (source: Blob | File): Promise<void> => {
   // binding is unreachable outside replay mode.
   if (typeof window !== 'undefined') {
     ;(window as unknown as { __sessionReplayer?: unknown }).__sessionReplayer = sessionReplayer
-    ;(window as unknown as { __stores?: unknown }).__stores = {
-      chatStore: useChatStore,
-      heatmapStore: useHeatmapStore,
-      intelligenceStore: useIntelligenceStore,
-      semanticStore: useSemanticStore,
-      multiStreamStore: useMultiStreamStore,
-    }
+    installStoreTestHooks()
   }
   const text = await source.slice(0).text()
   const frames: RecordedFrame[] = []
