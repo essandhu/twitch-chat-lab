@@ -136,4 +136,26 @@ describe('evaluate — boolean composition', () => {
     const subNoPog = makeMsg({ text: 'meh', badges: [badge('subscriber')] })
     expect(evalSrc(src, subNoPog)).toBe(false)
   })
+
+  it('risk:elevated matches when ctx.riskBandFor returns elevated', () => {
+    const ctx: EvalContext = { isDuringSpike: () => false, riskBandFor: () => 'elevated' }
+    expect(evalSrc('risk:elevated', makeMsg({}), ctx)).toBe(true)
+  })
+
+  it('risk:elevated does not match when ctx.riskBandFor returns calm', () => {
+    const ctx: EvalContext = { isDuringSpike: () => false, riskBandFor: () => 'calm' }
+    expect(evalSrc('risk:elevated', makeMsg({}), ctx)).toBe(false)
+  })
+
+  it('risk:calm AND kw:"pog" composes correctly', () => {
+    const ctx: EvalContext = { isDuringSpike: () => false, riskBandFor: () => 'calm' }
+    expect(evalSrc('risk:calm AND kw:"pog"', makeMsg({ text: 'pog champ' }), ctx)).toBe(true)
+    expect(evalSrc('risk:calm AND kw:"pog"', makeMsg({ text: 'no champ' }), ctx)).toBe(false)
+    const elevated: EvalContext = { isDuringSpike: () => false, riskBandFor: () => 'elevated' }
+    expect(evalSrc('risk:calm AND kw:"pog"', makeMsg({ text: 'pog champ' }), elevated)).toBe(false)
+  })
+
+  it('risk:critical without ctx.riskBandFor throws reserved error', () => {
+    expect(() => evalSrc('risk:critical', makeMsg({}), baseCtx)).toThrow(/risk_token_reserved_for_phase_9/)
+  })
 })

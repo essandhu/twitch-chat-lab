@@ -1,5 +1,5 @@
 import type { ChatMessage, FilterState } from '../../types/twitch'
-import type { EvalContext, FilterQuery } from './filterQuery'
+import type { EvalContext, FilterQuery, RiskBand } from './filterQuery'
 import { evaluate, parse } from './filterQuery'
 
 export function countActiveFilters(state: FilterState): number {
@@ -33,6 +33,7 @@ export function applyFilters(
   messages: ChatMessage[],
   state: FilterState,
   isDuringSpike: (ts: number) => boolean,
+  riskBandFor?: () => RiskBand,
 ): ChatMessage[] {
   const toggleAst = desugarToggles(state)
   const rawQuery = state.query ?? ''
@@ -42,6 +43,7 @@ export function applyFilters(
   if (!composed) return messages
 
   const ctx: EvalContext = { isDuringSpike }
+  if (riskBandFor) ctx.riskBandFor = riskBandFor
   return messages.filter((m) => {
     try {
       return evaluate(m, composed, ctx)

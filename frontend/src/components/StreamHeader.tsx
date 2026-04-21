@@ -7,6 +7,8 @@ import { StreamSelector, type StreamPick } from '../features/multiStream/StreamS
 import { startCompare, updateCompare } from '../features/multiStream/multiStreamService'
 import { Avatar } from './ui/Avatar'
 import { Button } from './ui/Button'
+import { RaidRiskChip } from '../features/intelligence/RaidRiskChip'
+import { RaidRiskTuner } from '../features/intelligence/RaidRiskTuner'
 
 export function StreamHeader(): JSX.Element | null {
   const session = useChatStore((s) => s.session)
@@ -152,6 +154,7 @@ export function StreamHeader(): JSX.Element | null {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <RaidRiskChip />
           <Button
             type="button"
             variant="secondary"
@@ -181,6 +184,7 @@ export function StreamHeader(): JSX.Element | null {
           )}
         </div>
       </div>
+      <RaidRiskTuner />
       {errorMessage && (
         <div
           role="alert"

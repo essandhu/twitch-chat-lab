@@ -11,6 +11,7 @@ export interface HelixUser {
   login: string
   display_name: string
   profile_image_url: string
+  created_at: string
 }
 
 export interface HelixStream {
@@ -570,3 +571,30 @@ export type ChatRow =
   | { kind: 'system'; id: string; event: SystemEvent; timestamp: Date }
   | { kind: 'deletion'; id: string; messageId: string; deletedAt: Date }
   | { kind: 'chat-cleared'; id: string; clearedAt: Date }
+
+// -----------------------------------------------------------------------------
+// Phase 9 — chat intelligence (heuristic layer)
+// -----------------------------------------------------------------------------
+
+export interface AnomalySignals {
+  similarityBurst: number
+  lexicalDiversityDrop: number
+  emoteVsTextRatio: number
+  newChatterInflux: number
+}
+
+export type AccountAgeBucket = 'new' | 'recent' | 'established' | 'unknown'
+
+export interface AccountAgeRecord {
+  bucket: AccountAgeBucket
+  source: 'helix' | 'approximate'
+  createdAt?: string
+}
+
+export type ExtractedSignalKind = 'question' | 'callout' | 'bitsContext'
+
+export interface ExtractedSignalRef {
+  messageId: string
+  kind: ExtractedSignalKind
+  timestamp: number
+}

@@ -32,6 +32,7 @@ const helixUser = (login: string, id: string): HelixUser => ({
   login,
   display_name: login.charAt(0).toUpperCase() + login.slice(1),
   profile_image_url: '',
+  created_at: '2020-01-01T00:00:00Z',
 })
 
 const helixStream = (userId: string, userLogin: string): HelixStream => ({

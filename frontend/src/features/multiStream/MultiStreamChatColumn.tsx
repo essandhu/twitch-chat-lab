@@ -7,6 +7,8 @@ import { Avatar } from '../../components/ui/Avatar'
 import { FilterToolbar } from '../filters/FilterToolbar'
 import { applyFilters } from '../filters/filterLogic'
 import { isDuringSpikeFor } from './derivedIsDuringSpike'
+import { useIntelligenceStore } from '../../store/intelligenceStore'
+import { RaidRiskChip } from '../intelligence/RaidRiskChip'
 
 interface MultiStreamChatColumnProps {
   streamLogin: string
@@ -22,8 +24,10 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
   const filteredMessages = useMemo(() => {
     if (!slice) return []
     const spikeFn = isDuringSpikeFor(slice.dataPoints)
-    return applyFilters(slice.messages, filterState, spikeFn)
-  }, [slice, filterState])
+    const riskBandFor = () =>
+      useIntelligenceStore.getState().slices[streamLogin]?.raidBand ?? 'calm'
+    return applyFilters(slice.messages, filterState, spikeFn, riskBandFor)
+  }, [slice, filterState, streamLogin])
 
   // Re-show banner on fresh transition out of degraded state.
   useEffect(() => {
@@ -72,6 +76,7 @@ export function MultiStreamChatColumn({ streamLogin }: MultiStreamChatColumnProp
           <span className="font-semibold text-sm text-text truncate">
             {slice.displayName}
           </span>
+          <RaidRiskChip streamLogin={streamLogin} compact />
         </div>
         <IconButton
           size="sm"

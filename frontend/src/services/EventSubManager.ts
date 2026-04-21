@@ -2,6 +2,7 @@ import { logger, setGlobalCorrelationId } from '../lib/logger'
 import { buildPinnedMessage, buildSystemEvent } from '../store/chatMessageMapper'
 import { useChatStore } from '../store/chatStore'
 import { useHeatmapStore } from '../store/heatmapStore'
+import { useIntelligenceStore } from '../store/intelligenceStore'
 import type {
   ChannelChatClearEvent,
   ChannelChatClearUserMessagesEvent,
@@ -169,6 +170,7 @@ export class EventSubManager {
     if (this.tickTimer) clearInterval(this.tickTimer)
     this.tickTimer = setInterval(() => {
       useHeatmapStore.getState().tick()
+      useIntelligenceStore.getState().tick(Date.now())
     }, TICK_INTERVAL_MS)
   }
 
@@ -226,6 +228,19 @@ export class EventSubManager {
       const event = payload.event as ChannelChatMessageEvent
       useChatStore.getState().addMessage(event)
       useHeatmapStore.getState().incrementCounter()
+      const chat = useChatStore.getState()
+      const built = chat.messagesById[event.message_id]
+      const session = chat.session
+      if (built) {
+        if (session) {
+          useIntelligenceStore.getState().ingestMessage(built, undefined, {
+            login: session.broadcasterLogin,
+            displayName: session.broadcasterDisplayName,
+          })
+        } else {
+          logger.warn('intelligence.ingest.no_session', { messageId: event.message_id })
+        }
+      }
       return
     }
 

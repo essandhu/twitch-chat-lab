@@ -1,6 +1,7 @@
 import { logger as defaultLogger, setGlobalCorrelationId } from '../../lib/logger'
 import { annotationFromEvent } from '../../services/annotationFromEvent'
 import { recordLatencySample } from '../../services/EventSubLatencyChannel'
+import { useIntelligenceStore } from '../../store/intelligenceStore'
 import { useMultiStreamStore } from '../../store/multiStreamStore'
 import type {
   ChannelChatMessageEvent,
@@ -239,6 +240,9 @@ export class ProxyClient {
       const store = useMultiStreamStore.getState()
       store.tickAll()
       store.tickCorrelation()
+      const intelligence = useIntelligenceStore.getState()
+      const now = Date.now()
+      for (const login of Object.keys(store.streams)) intelligence.tick(now, login)
     }, TICK_INTERVAL_MS)
   }
 
@@ -297,6 +301,14 @@ export class ProxyClient {
       const store = useMultiStreamStore.getState()
       store.addMessage(envelope.stream_login, event)
       store.incrementCounter(envelope.stream_login)
+      const slice = useMultiStreamStore.getState().streams[envelope.stream_login]
+      if (slice && slice.messages.length > 0) {
+        const built = slice.messages[slice.messages.length - 1]
+        useIntelligenceStore.getState().ingestMessage(built, envelope.stream_login, {
+          login: slice.login,
+          displayName: slice.displayName,
+        })
+      }
       return
     }
 

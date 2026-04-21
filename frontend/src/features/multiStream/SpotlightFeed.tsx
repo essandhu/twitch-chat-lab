@@ -6,6 +6,7 @@ import { ChatMessage } from '../chat/ChatMessage'
 import { Badge } from '../../components/ui/Badge'
 import type { ChatMessage as ChatMessageData } from '../../types/twitch'
 import { isDuringSpikeFor } from './derivedIsDuringSpike'
+import { useIntelligenceStore } from '../../store/intelligenceStore'
 
 const MAX_ROWS = 1000
 const ROW_ESTIMATED_HEIGHT = 40
@@ -29,7 +30,9 @@ const mergeRows = (
     const filter = filterState[login]
     if (!filter) continue
     const spikeFn = isDuringSpikeFor(slice.dataPoints)
-    const matched = applyFilters(slice.messages, filter, spikeFn)
+    const riskBandFor = () =>
+      useIntelligenceStore.getState().slices[login]?.raidBand ?? 'calm'
+    const matched = applyFilters(slice.messages, filter, spikeFn, riskBandFor)
     for (const message of matched) {
       merged.push({
         key: `${login}:${message.id}`,
