@@ -43,7 +43,12 @@ const hydrateProfileImages = (logins: string[]): void => {
  */
 
 let activeClient: ProxyClient | null = null
-let lastEventSubArgs: { broadcasterId: string; userId: string; token: string } | null = null
+let lastEventSubArgs: {
+  broadcasterId: string
+  broadcasterLogin?: string
+  userId: string
+  token: string
+} | null = null
 // Last channel list we told the proxy about — lets updateCompare compute a
 // minimal diff instead of tearing down and recreating the session. Kept in
 // step with startCompare / successful updateCompare / stopCompare.
@@ -164,6 +169,7 @@ export const startCompare = async (args: StartCompareArgs): Promise<void> => {
   // Remember the single-stream args so we can restore EventSub on exit.
   lastEventSubArgs = {
     broadcasterId: args.session.broadcasterId,
+    broadcasterLogin: args.session.broadcasterLogin,
     userId: args.authedUserId,
     token,
   }
@@ -249,6 +255,7 @@ export const updateCompare = async (args: UpdateCompareArgs): Promise<void> => {
 
   lastEventSubArgs = {
     broadcasterId: args.session.broadcasterId,
+    broadcasterLogin: args.session.broadcasterLogin,
     userId: args.authedUserId,
     token,
   }

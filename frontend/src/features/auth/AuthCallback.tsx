@@ -68,6 +68,7 @@ export const AuthCallback = () => {
 
         await eventSubManager.connect({
           broadcasterId: broadcaster.id,
+          broadcasterLogin: broadcaster.login,
           userId: authedUser.id,
           token,
         })

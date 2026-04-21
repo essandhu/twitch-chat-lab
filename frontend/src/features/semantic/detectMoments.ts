@@ -5,6 +5,7 @@ import type {
   Moment,
   MomentKind,
 } from '../../types/twitch'
+import { fnv1a } from '../../lib/hash'
 import { centroid, cosineSim } from './cosineSim'
 
 const SEMANTIC_WINDOW_MS = 5 * 60_000
@@ -17,15 +18,6 @@ const EMOTE_STORM_THRESHOLD = 0.75
 const QA_WINDOW_MS = 30_000
 const QA_MIN_COUNT = 3
 const LABEL_MAX_LEN = 40
-
-const fnv1a = (input: string): string => {
-  let hash = 0x811c9dc5 >>> 0
-  for (let i = 0; i < input.length; i++) {
-    hash ^= input.charCodeAt(i)
-    hash = (hash + ((hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24))) >>> 0
-  }
-  return hash.toString(16).padStart(8, '0')
-}
 
 export const hashMomentId = (kind: MomentKind, startedAt: Date, firstRelatedMessageId: string): string =>
   fnv1a(`${kind}|${startedAt.toISOString()}|${firstRelatedMessageId}`)
