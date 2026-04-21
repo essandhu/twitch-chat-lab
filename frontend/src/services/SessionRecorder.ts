@@ -72,6 +72,10 @@ export class SessionRecorder {
     return this.recording
   }
 
+  hasFrames(): boolean {
+    return this.buffer.size > 0
+  }
+
   start(): void {
     if (this.recording) return
     this.recording = true

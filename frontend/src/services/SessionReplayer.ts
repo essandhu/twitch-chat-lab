@@ -163,6 +163,18 @@ export class SessionReplayer {
     return this.currentWallPosition()
   }
 
+  getDuration(): number {
+    return this.duration
+  }
+
+  getFirstT(): number {
+    return this.firstT
+  }
+
+  isPlaying(): boolean {
+    return this.playing
+  }
+
   onPositionChange(cb: (ms: number) => void): () => void {
     this.listeners.add(cb)
     return () => {

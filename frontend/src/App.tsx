@@ -23,22 +23,18 @@ import { MultiStreamLayout } from './features/multiStream/MultiStreamLayout'
 import { IntelligencePanel } from './features/intelligence/IntelligencePanel'
 import { Tabs } from './components/ui/Tabs'
 import { PerfOverlay } from './features/perfPanel/PerfOverlay'
+import { StressTestPage } from './features/stress/StressTestPage'
 import { applyFilterFromUrl } from './features/filters/applyFilterFromUrl'
 import { enterReplayFromUrl, isReplayMode } from './features/record/replayBoot'
 import { getDemoConfig, isDemoMode } from './services/DemoModeService'
 import { logger } from './lib/logger'
 
+const NOTICE_CLS = 'mb-8 max-w-md border border-warning/40 bg-surface-raised p-4 font-mono text-[11px] uppercase tracking-[0.22em] text-warning'
 const DemoMisconfigNotice = () => (
-  <div className="mb-8 max-w-md border border-warning/40 bg-surface-raised p-4 font-mono text-[11px] uppercase tracking-[0.22em] text-warning">
-    Demo mode not configured — set VITE_DEMO_* in env.
-  </div>
+  <div className={NOTICE_CLS}>Demo mode not configured — set VITE_DEMO_* in env.</div>
 )
-
 const DemoUnavailableNotice = () => (
-  <div
-    role="alert"
-    className="mb-8 max-w-md border border-warning/40 bg-surface-raised p-4 font-mono text-[11px] uppercase tracking-[0.22em] text-warning"
-  >
+  <div role="alert" className={NOTICE_CLS}>
     Demo unavailable — couldn't find a live channel. Try again in a moment.
   </div>
 )
@@ -152,9 +148,7 @@ const readSingleDockTab = (): string => {
 const storeSingleDockTab = (tab: string): void => {
   try {
     if (typeof localStorage !== 'undefined') localStorage.setItem(SINGLE_DOCK_TAB_KEY, tab)
-  } catch {
-    // ignore
-  }
+  } catch { /* ignore */ }
 }
 
 const ChatDockContent = () => {
@@ -259,6 +253,7 @@ export const App = () => (
     <Routes>
       <Route path="/" element={<LandingView />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/stress" element={<StressTestPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   </BrowserRouter>
