@@ -17,6 +17,15 @@ No login required — read-only demo against a popular live channel.
 - **Multi-stream chat comparison** — 2 or 3 streams in the same Twitch category, side-by-side, fanned in by a Go WebSocket proxy. One client WebSocket; the proxy maintains one EventSub connection per stream.
 - **Performance instrumentation overlay** — `Ctrl+Shift+P` reveals render msg/s, virtualizer time, DOM node count, JS heap (Chromium-only), and EventSub end-to-end latency.
 
+## Semantic search & moments
+
+A client-side semantic layer runs over the live chat. On boot, the `Xenova/all-MiniLM-L6-v2` quantized ONNX model (~22 MB, one-time download, cached by the browser on subsequent loads) is fetched lazily via `requestIdleCallback` and hosted in a Web Worker that runs transformers.js off the main thread.
+
+- **Search.** The `Semantic` sub-tab of the Intelligence panel supports cosine-similarity search: type a phrase and the top-20 message results render with score bars (0–1) and click-to-scroll into chat.
+- **Moments.** A `MomentsTimeline` above the heatmap clusters interesting windows into five kinds: `spike` (msg/s burst over rolling baseline), `emote-storm` (dominant-emote density), `qa-cluster` (question concentration), `raid` (raid-risk triangulation), and `semantic-cluster` (vocabulary clusters via k-means-lite).
+- **Privacy.** **Embeddings run locally; no chat content leaves your browser.** Append `?semantic=0` to the URL to opt out at boot; a tooltip chip in the top nav mirrors the worker status (`loading` / `ready` / `off`).
+- **Multi-stream cost.** Each additional active stream adds ~20–40 MB to the embedding cache (10k vectors × 384 × 4 bytes ≈ 15 MB + overhead), surfaced in the activation dialog.
+
 ## What the perf panel shows
 
 | Metric | What it measures | Healthy range |
