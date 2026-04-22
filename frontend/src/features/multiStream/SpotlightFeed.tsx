@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useMultiStreamStore } from '../../store/multiStreamStore'
 import { applyFilters } from '../filters/filterLogic'
@@ -7,9 +7,13 @@ import { Badge } from '../../components/ui/Badge'
 import type { ChatMessage as ChatMessageData } from '../../types/twitch'
 import { isDuringSpikeFor } from './derivedIsDuringSpike'
 import { useIntelligenceStore } from '../../store/intelligenceStore'
+import { ScrollToBottom } from '../chat/ScrollToBottom'
 
 const MAX_ROWS = 1000
 const ROW_ESTIMATED_HEIGHT = 40
+// Merged feeds churn faster than single-channel chat, so we use a more generous
+// threshold before disabling auto-scroll.
+const AUTO_SCROLL_THRESHOLD_PX = 150
 
 interface SpotlightRow {
   key: string
@@ -67,6 +71,27 @@ export function SpotlightFeed(): JSX.Element {
     overscan: 8,
   })
 
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true)
+
+  useEffect(() => {
+    if (autoScrollEnabled && rows.length > 0) {
+      virtualizer.scrollToIndex(rows.length - 1, { align: 'end' })
+    }
+  }, [rows.length, autoScrollEnabled, virtualizer])
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>): void => {
+    const el = e.currentTarget
+    const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight)
+    setAutoScrollEnabled(distanceFromBottom <= AUTO_SCROLL_THRESHOLD_PX)
+  }
+
+  const jumpToLatest = (): void => {
+    if (rows.length > 0) {
+      virtualizer.scrollToIndex(rows.length - 1, { align: 'end' })
+    }
+    setAutoScrollEnabled(true)
+  }
+
   if (rows.length === 0) {
     return (
       <div
@@ -82,46 +107,50 @@ export function SpotlightFeed(): JSX.Element {
   const totalSize = virtualizer.getTotalSize()
 
   return (
-    <div
-      ref={parentRef}
-      data-testid="spotlight-feed"
-      className="h-full overflow-auto"
-    >
+    <div className="relative h-full">
       <div
-        style={{
-          height: `${totalSize}px`,
-          width: '100%',
-          position: 'relative',
-        }}
+        ref={parentRef}
+        data-testid="spotlight-feed"
+        className="h-full overflow-auto"
+        onScroll={handleScroll}
       >
-        {items.map((item) => {
-          const row = rows[item.index]
-          return (
-            <div
-              key={row.key}
-              data-testid="spotlight-row"
-              data-index={item.index}
-              ref={virtualizer.measureElement}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${item.start}px)`,
-              }}
-            >
-              <div className="flex items-start gap-1 px-2 py-0.5">
-                <Badge className="shrink-0 mt-0.5 font-mono text-[10px] px-1.5 py-0.5">
-                  {row.sourceDisplayName}
-                </Badge>
-                <div className="min-w-0 flex-1">
-                  <ChatMessage message={row.message} />
+        <div
+          style={{
+            height: `${totalSize}px`,
+            width: '100%',
+            position: 'relative',
+          }}
+        >
+          {items.map((item) => {
+            const row = rows[item.index]
+            return (
+              <div
+                key={row.key}
+                data-testid="spotlight-row"
+                data-index={item.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${item.start}px)`,
+                }}
+              >
+                <div className="flex items-start gap-1 px-2 py-0.5">
+                  <Badge className="shrink-0 mt-0.5 font-mono text-[10px] px-1.5 py-0.5">
+                    {row.sourceDisplayName}
+                  </Badge>
+                  <div className="min-w-0 flex-1">
+                    <ChatMessage message={row.message} />
+                  </div>
                 </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
+      <ScrollToBottom visible={!autoScrollEnabled} onClick={jumpToLatest} />
     </div>
   )
 }

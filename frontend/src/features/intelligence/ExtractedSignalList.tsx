@@ -1,9 +1,10 @@
 import { useContext, useMemo } from 'react'
 import { logger } from '../../lib/logger'
-import type { ChatMessage, ExtractedSignalKind, ExtractedSignalRef } from '../../types/twitch'
+import type { AccountAgeRecord, ChatMessage, ExtractedSignalKind, ExtractedSignalRef } from '../../types/twitch'
 import { ChatScrollContext } from '../chat/chatScrollContext'
 import { PRIMARY_STREAM_KEY, useIntelligenceStore } from '../../store/intelligenceStore'
 import { AccountAgeBadge } from './AccountAgeBadge'
+import { Badge } from '../../components/ui/Badge'
 
 interface Props {
   kind: ExtractedSignalKind
@@ -11,6 +12,8 @@ interface Props {
   resolve: (id: string) => ChatMessage | undefined
   canScroll: boolean
   streamLogin?: string
+  streamBadgeByMessageId?: Record<string, string>
+  accountAgeByUserId?: Record<string, AccountAgeRecord>
 }
 
 const MAX_ROWS = 50
@@ -22,12 +25,21 @@ const EMPTY: Record<ExtractedSignalKind, string> = {
 
 let warned = false
 
-export function ExtractedSignalList({ kind, refs, resolve, canScroll, streamLogin }: Props): JSX.Element {
+export function ExtractedSignalList({
+  kind,
+  refs,
+  resolve,
+  canScroll,
+  streamLogin,
+  streamBadgeByMessageId,
+  accountAgeByUserId,
+}: Props): JSX.Element {
   const scrollTo = useContext(ChatScrollContext)
   const rows = useMemo(() => refs.slice(-MAX_ROWS).reverse(), [refs])
-  const accountAgeByUser = useIntelligenceStore(
+  const sliceAccountAge = useIntelligenceStore(
     (s) => s.slices[streamLogin ?? PRIMARY_STREAM_KEY]?.accountAge ?? {},
   )
+  const accountAgeByUser = accountAgeByUserId ?? sliceAccountAge
 
   if (rows.length === 0) {
     return (
@@ -53,12 +65,21 @@ export function ExtractedSignalList({ kind, refs, resolve, canScroll, streamLogi
       {rows.map((ref) => {
         const msg = resolve(ref.messageId)
         const age = msg ? accountAgeByUser[msg.userId] : undefined
+        const streamBadge = streamBadgeByMessageId?.[ref.messageId]
         return (
           <li key={ref.messageId} data-testid="intelligence-row" data-kind={kind} data-message-id={ref.messageId}>
             <button type="button" onClick={() => handleClick(ref.messageId)} className="flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-surface-hover focus:outline-none focus-visible:bg-surface-hover">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="flex items-baseline truncate font-mono text-[11px] text-text-muted">
-                  {msg?.displayName ?? '?'}
+                <span className="flex min-w-0 items-baseline gap-1.5 truncate font-mono text-[11px] text-text-muted">
+                  {streamBadge ? (
+                    <Badge
+                      data-testid="intelligence-row-stream-badge"
+                      className="shrink-0 font-mono text-[10px] px-1.5 py-0"
+                    >
+                      {streamBadge}
+                    </Badge>
+                  ) : null}
+                  <span className="truncate">{msg?.displayName ?? '?'}</span>
                   {age ? <AccountAgeBadge source={age.source} bucket={age.bucket} /> : null}
                 </span>
                 <span className="shrink-0 font-mono text-[10px] tabular-nums text-text-muted">
