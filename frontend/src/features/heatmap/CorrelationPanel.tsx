@@ -6,6 +6,9 @@ import { tokenRgb, tokenRgba, type Token } from '../../lib/theme'
 const BUFFER_CAP = 60
 const PALETTE: Token[] = ['accent', 'success', 'warning', 'danger']
 
+export const AXIS_LABEL_TIME = 'Time (mm:ss)'
+export const AXIS_LABEL_CORRELATION = 'Correlation (r)'
+
 interface Snapshot {
   t: number
   r: number
@@ -36,7 +39,12 @@ interface CorrelationTooltipProps {
   startMs: number
 }
 
-const CorrelationTooltip = ({ active, payload, label, startMs }: CorrelationTooltipProps) => {
+export const CorrelationTooltip = ({
+  active,
+  payload,
+  label,
+  startMs,
+}: CorrelationTooltipProps) => {
   if (!active || !payload || payload.length === 0 || label === undefined) {
     return null
   }
@@ -118,7 +126,7 @@ export function CorrelationPanel(): JSX.Element | null {
             stroke={axisStroke}
             allowDuplicatedCategory={false}
             label={{
-              value: 'Time (mm:ss)',
+              value: AXIS_LABEL_TIME,
               position: 'insideBottom',
               offset: -12,
               fill: axisLabelFill,
@@ -130,7 +138,7 @@ export function CorrelationPanel(): JSX.Element | null {
             stroke={axisStroke}
             allowDecimals
             label={{
-              value: 'Correlation (r)',
+              value: AXIS_LABEL_CORRELATION,
               angle: -90,
               position: 'insideLeft',
               fill: axisLabelFill,

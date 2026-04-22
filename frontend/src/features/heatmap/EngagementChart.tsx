@@ -13,6 +13,9 @@ import { tokenRgb, tokenRgba, type Token } from '../../lib/theme'
 import type { EventAnnotation, HeatmapDataPoint } from '../../types/twitch'
 import { AnomalyOverlay } from '../intelligence/AnomalyOverlay'
 
+export const AXIS_LABEL_TIME = 'Time (mm:ss)'
+export const AXIS_LABEL_MSG_PER_SEC = 'Messages / second'
+
 export const formatTickMMSS = (startMs: number, ts: number): string => {
   const totalSec = Math.max(0, Math.floor((ts - startMs) / 1000))
   const mm = Math.floor(totalSec / 60).toString().padStart(2, '0')
@@ -62,7 +65,7 @@ interface ChartTooltipProps {
   showSeriesName: boolean
 }
 
-const ChartTooltip = ({
+export const ChartTooltip = ({
   active,
   payload,
   label,
@@ -137,7 +140,7 @@ export const EngagementChart = () => {
           interval="preserveStartEnd"
           stroke={axisStroke}
           label={{
-            value: 'Time (mm:ss)',
+            value: AXIS_LABEL_TIME,
             position: 'insideBottom',
             offset: -8,
             fill: axisLabelFill,
@@ -149,7 +152,7 @@ export const EngagementChart = () => {
           allowDecimals={false}
           stroke={axisStroke}
           label={{
-            value: 'Messages / second',
+            value: AXIS_LABEL_MSG_PER_SEC,
             angle: -90,
             position: 'insideLeft',
             fill: axisLabelFill,
@@ -247,7 +250,7 @@ const MultiChart = ({ streams }: MultiChartProps) => {
           stroke={axisStroke}
           allowDuplicatedCategory={false}
           label={{
-            value: 'Time (mm:ss)',
+            value: AXIS_LABEL_TIME,
             position: 'insideBottom',
             offset: -12,
             fill: axisLabelFill,
@@ -259,7 +262,7 @@ const MultiChart = ({ streams }: MultiChartProps) => {
           allowDecimals={false}
           stroke={axisStroke}
           label={{
-            value: 'Messages / second',
+            value: AXIS_LABEL_MSG_PER_SEC,
             angle: -90,
             position: 'insideLeft',
             fill: axisLabelFill,

@@ -4,7 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useHeatmapStore } from '../../store/heatmapStore'
 import { useMultiStreamStore } from '../../store/multiStreamStore'
 import type { EventAnnotation, HeatmapDataPoint } from '../../types/twitch'
-import { EngagementChart, formatTickMMSS } from './EngagementChart'
+import {
+  AXIS_LABEL_MSG_PER_SEC,
+  AXIS_LABEL_TIME,
+  ChartTooltip,
+  EngagementChart,
+  formatTickMMSS,
+} from './EngagementChart'
 
 // Recharts' ResponsiveContainer measures the DOM for width/height. happy-dom
 // reports 0×0 so the chart body never renders, making DOM-level assertions on
@@ -337,6 +343,86 @@ describe('EngagementChart — token-driven chart colors', () => {
     // tokenRgb() emits the same CSS-variable string regardless of theme; the
     // browser resolves the variable per the active data-theme.
     expect(line!.getAttribute('stroke')).toBe('rgb(var(--accent))')
+  })
+})
+
+describe('ChartTooltip', () => {
+  const startMs = 1_700_000_000_000
+
+  it('returns null when inactive', () => {
+    const { container } = render(
+      <ChartTooltip
+        active={false}
+        payload={[{ value: 5, name: 'Alice', color: '#abc' }]}
+        label={startMs + 1000}
+        startMs={startMs}
+        showSeriesName
+      />,
+    )
+    expect(container.firstChild).toBeNull()
+  })
+
+  it('returns null when payload is empty', () => {
+    const { container } = render(
+      <ChartTooltip
+        active
+        payload={[]}
+        label={startMs + 1000}
+        startMs={startMs}
+        showSeriesName
+      />,
+    )
+    expect(container.firstChild).toBeNull()
+  })
+
+  it('renders timestamp header and msg/s value with color swatch', () => {
+    const { container, getByRole } = render(
+      <ChartTooltip
+        active
+        payload={[{ value: 42, name: 'Alice', color: 'rgb(1,2,3)' }]}
+        label={startMs + 65_000}
+        startMs={startMs}
+        showSeriesName={false}
+      />,
+    )
+    const tooltip = getByRole('tooltip')
+    expect(tooltip).toHaveTextContent('01:05')
+    expect(tooltip).toHaveTextContent('42 msg/s')
+    const swatch = container.querySelector('span[aria-hidden]')
+    expect(swatch).not.toBeNull()
+    expect((swatch as HTMLElement).style.backgroundColor).toBe('rgb(1, 2, 3)')
+  })
+
+  it('omits series name in single mode and includes it in multi mode', () => {
+    const single = render(
+      <ChartTooltip
+        active
+        payload={[{ value: 3, name: 'Messages / second', color: '#abc' }]}
+        label={startMs}
+        startMs={startMs}
+        showSeriesName={false}
+      />,
+    )
+    expect(single.queryByText('Messages / second:')).toBeNull()
+    single.unmount()
+
+    const multi = render(
+      <ChartTooltip
+        active
+        payload={[{ value: 3, name: 'Alice', color: '#abc' }]}
+        label={startMs}
+        startMs={startMs}
+        showSeriesName
+      />,
+    )
+    expect(multi.getByText('Alice:')).toBeInTheDocument()
+  })
+})
+
+describe('EngagementChart axis labels', () => {
+  it('exposes the expected axis label strings', () => {
+    expect(AXIS_LABEL_TIME).toBe('Time (mm:ss)')
+    expect(AXIS_LABEL_MSG_PER_SEC).toBe('Messages / second')
   })
 })
 
