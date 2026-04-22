@@ -21,17 +21,17 @@ export const HeatmapPanel = () => {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto">
       <div className="grid grid-cols-2 gap-3 p-3">
-        <StatCard label="Now" value={currentValue.toLocaleString('en-US')} />
+        <StatCard label="Now (msg/s)" value={currentValue.toLocaleString('en-US')} />
         <StatCard
-          label="Peak"
+          label="Peak (msg/s)"
           value={peakValue.toLocaleString('en-US')}
           accent="peak"
         />
       </div>
       <MomentsTimeline />
-      <div className="flex-1 min-h-0 p-3">
+      <div className="min-h-[320px] flex-1 p-3">
         <EngagementChart />
       </div>
       {data.mode === 'multi' && (

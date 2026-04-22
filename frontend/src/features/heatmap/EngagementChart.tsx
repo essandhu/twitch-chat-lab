@@ -1,4 +1,13 @@
-import { Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
+import {
+  Legend,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import { useHeatmapData } from '../../hooks/useHeatmapData'
 import { tokenRgb, tokenRgba, type Token } from '../../lib/theme'
 import type { EventAnnotation, HeatmapDataPoint } from '../../types/twitch'
@@ -38,6 +47,59 @@ interface MultiStreamSeries {
   annotations: EventAnnotation[]
 }
 
+interface TooltipPayloadEntry {
+  value?: number
+  name?: string
+  color?: string
+  stroke?: string
+}
+
+interface ChartTooltipProps {
+  active?: boolean
+  payload?: TooltipPayloadEntry[]
+  label?: number
+  startMs: number
+  showSeriesName: boolean
+}
+
+const ChartTooltip = ({
+  active,
+  payload,
+  label,
+  startMs,
+  showSeriesName,
+}: ChartTooltipProps) => {
+  if (!active || !payload || payload.length === 0 || label === undefined) {
+    return null
+  }
+  const time = formatTickMMSS(startMs, label)
+  return (
+    <div
+      className="rounded border border-border bg-surface-raised px-2 py-1.5 font-mono text-[11px] shadow-lg"
+      role="tooltip"
+    >
+      <div className="text-text-muted">{time}</div>
+      {payload.map((entry, idx) => {
+        const swatch = entry.color ?? entry.stroke ?? tokenRgb('accent')
+        const value = typeof entry.value === 'number' ? entry.value : 0
+        return (
+          <div key={idx} className="mt-0.5 flex items-center gap-1.5 text-text">
+            <span
+              aria-hidden
+              className="inline-block h-2 w-2 rounded-sm"
+              style={{ backgroundColor: swatch }}
+            />
+            {showSeriesName && entry.name ? (
+              <span className="text-text-muted">{entry.name}:</span>
+            ) : null}
+            <span>{value.toLocaleString('en-US')} msg/s</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export const EngagementChart = () => {
   const data = useHeatmapData()
 
@@ -60,11 +122,12 @@ export const EngagementChart = () => {
     dataPoints.length === 0 ? '' : formatTickMMSS(startMs, ts)
 
   const axisStroke = tokenRgba('textMuted', 0.3)
+  const axisLabelFill = tokenRgb('textMuted')
   const mainStroke = tokenRgb('accent')
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={dataPoints} margin={{ top: 16, right: 16, bottom: 8, left: 8 }}>
+      <LineChart data={dataPoints} margin={{ top: 16, right: 16, bottom: 24, left: 16 }}>
         <XAxis
           dataKey="timestamp"
           type="number"
@@ -73,11 +136,41 @@ export const EngagementChart = () => {
           tickCount={5}
           interval="preserveStartEnd"
           stroke={axisStroke}
+          label={{
+            value: 'Time (mm:ss)',
+            position: 'insideBottom',
+            offset: -8,
+            fill: axisLabelFill,
+            fontSize: 10,
+          }}
         />
-        <YAxis domain={[0, 'auto']} allowDecimals={false} stroke={axisStroke} />
+        <YAxis
+          domain={[0, 'auto']}
+          allowDecimals={false}
+          stroke={axisStroke}
+          label={{
+            value: 'Messages / second',
+            angle: -90,
+            position: 'insideLeft',
+            fill: axisLabelFill,
+            fontSize: 10,
+            style: { textAnchor: 'middle' },
+          }}
+        />
+        <Tooltip
+          cursor={{ stroke: axisStroke, strokeDasharray: '3 3' }}
+          content={(props) => (
+            <ChartTooltip
+              {...(props as ChartTooltipProps)}
+              startMs={startMs}
+              showSeriesName={false}
+            />
+          )}
+        />
         <Line
           type="monotone"
           dataKey="msgPerSec"
+          name="Messages / second"
           stroke={mainStroke}
           strokeWidth={2}
           dot={false}
@@ -138,11 +231,12 @@ const MultiChart = ({ streams }: MultiChartProps) => {
   )
 
   const axisStroke = tokenRgba('textMuted', 0.3)
+  const axisLabelFill = tokenRgb('textMuted')
   const legendColor = tokenRgb('textMuted')
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart margin={{ top: 16, right: 16, bottom: 8, left: 8 }}>
+      <LineChart margin={{ top: 16, right: 16, bottom: 24, left: 16 }}>
         <XAxis
           dataKey="timestamp"
           type="number"
@@ -152,8 +246,37 @@ const MultiChart = ({ streams }: MultiChartProps) => {
           interval="preserveStartEnd"
           stroke={axisStroke}
           allowDuplicatedCategory={false}
+          label={{
+            value: 'Time (mm:ss)',
+            position: 'insideBottom',
+            offset: -8,
+            fill: axisLabelFill,
+            fontSize: 10,
+          }}
         />
-        <YAxis domain={[0, 'auto']} allowDecimals={false} stroke={axisStroke} />
+        <YAxis
+          domain={[0, 'auto']}
+          allowDecimals={false}
+          stroke={axisStroke}
+          label={{
+            value: 'Messages / second',
+            angle: -90,
+            position: 'insideLeft',
+            fill: axisLabelFill,
+            fontSize: 10,
+            style: { textAnchor: 'middle' },
+          }}
+        />
+        <Tooltip
+          cursor={{ stroke: axisStroke, strokeDasharray: '3 3' }}
+          content={(props) => (
+            <ChartTooltip
+              {...(props as ChartTooltipProps)}
+              startMs={startMs}
+              showSeriesName={true}
+            />
+          )}
+        />
         <Legend wrapperStyle={{ color: legendColor }} />
         {streams.map((s, idx) => (
           <Line
