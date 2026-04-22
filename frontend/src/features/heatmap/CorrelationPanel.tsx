@@ -4,7 +4,10 @@ import { pairKeyFor, useMultiStreamStore } from '../../store/multiStreamStore'
 import { tokenRgb, tokenRgba, type Token } from '../../lib/theme'
 
 const BUFFER_CAP = 60
-const PALETTE: Token[] = ['accent', 'warning', 'success', 'danger']
+const PALETTE: Token[] = ['accent', 'success', 'warning', 'danger']
+
+export const AXIS_LABEL_TIME = 'Time (mm:ss)'
+export const AXIS_LABEL_CORRELATION = 'Correlation (r)'
 
 interface Snapshot {
   t: number
@@ -19,6 +22,57 @@ const formatClock = (startMs: number, ts: number): string => {
   const mm = Math.floor(total / 60).toString().padStart(2, '0')
   const ss = (total % 60).toString().padStart(2, '0')
   return `${mm}:${ss}`
+}
+
+interface TooltipPayloadEntry {
+  value?: number
+  name?: string
+  color?: string
+  stroke?: string
+  payload?: Snapshot
+}
+
+interface CorrelationTooltipProps {
+  active?: boolean
+  payload?: TooltipPayloadEntry[]
+  label?: number
+  startMs: number
+}
+
+export const CorrelationTooltip = ({
+  active,
+  payload,
+  label,
+  startMs,
+}: CorrelationTooltipProps) => {
+  if (!active || !payload || payload.length === 0 || label === undefined) {
+    return null
+  }
+  const time = formatClock(startMs, label)
+  return (
+    <div
+      className="rounded border border-border bg-surface-raised px-2 py-1.5 font-mono text-[11px] shadow-lg"
+      role="tooltip"
+    >
+      <div className="text-text-muted">{time}</div>
+      {payload.map((entry, idx) => {
+        const swatch = entry.color ?? entry.stroke ?? tokenRgb('accent')
+        const r = typeof entry.value === 'number' ? entry.value : Number.NaN
+        const lagMs = entry.payload?.lagMs ?? 0
+        return (
+          <div key={idx} className="mt-0.5 flex items-center gap-1.5 text-text">
+            <span
+              aria-hidden
+              className="inline-block h-2 w-2 rounded-sm"
+              style={{ backgroundColor: swatch }}
+            />
+            {entry.name ? <span className="text-text-muted">{entry.name}:</span> : null}
+            <span>r={Number.isNaN(r) ? 'n/a' : r.toFixed(2)}, lag={lagMs}ms</span>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 export function CorrelationPanel(): JSX.Element | null {
@@ -52,6 +106,7 @@ export function CorrelationPanel(): JSX.Element | null {
 
   const start = startRef.current ?? Date.now()
   const axisStroke = tokenRgba('textMuted', 0.3)
+  const axisLabelFill = tokenRgb('textMuted')
   const legendColor = tokenRgb('textMuted')
 
   return (
@@ -60,25 +115,51 @@ export function CorrelationPanel(): JSX.Element | null {
       className="h-full w-full"
     >
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart margin={{ top: 16, right: 16, bottom: 8, left: 8 }}>
+        <LineChart margin={{ top: 32, right: 16, bottom: 28, left: 16 }}>
           <XAxis
             dataKey="t"
             type="number"
             domain={['dataMin', 'dataMax']}
             tickFormatter={(ts: number) => formatClock(start, ts)}
+            tickCount={5}
+            interval="preserveStartEnd"
             stroke={axisStroke}
             allowDuplicatedCategory={false}
-          />
-          <YAxis domain={[-1, 1]} stroke={axisStroke} allowDecimals />
-          <Legend wrapperStyle={{ color: legendColor }} />
-          <Tooltip
-            formatter={(value: number, _name, item) => {
-              const snapshot = item.payload as Snapshot | undefined
-              const key = (item as unknown as { name?: string }).name ?? ''
-              const lagMs = snapshot?.lagMs ?? 0
-              const coeff = Number.isNaN(value) ? NaN : value
-              return [`${key}: r=${coeff.toFixed(2)}, lag=${lagMs}ms`, '']
+            label={{
+              value: AXIS_LABEL_TIME,
+              position: 'insideBottom',
+              offset: -12,
+              fill: axisLabelFill,
+              fontSize: 10,
             }}
+          />
+          <YAxis
+            domain={[-1, 1]}
+            stroke={axisStroke}
+            allowDecimals
+            label={{
+              value: AXIS_LABEL_CORRELATION,
+              angle: -90,
+              position: 'insideLeft',
+              fill: axisLabelFill,
+              fontSize: 10,
+              style: { textAnchor: 'middle' },
+            }}
+          />
+          <Tooltip
+            cursor={{ stroke: axisStroke, strokeDasharray: '3 3' }}
+            content={(props) => (
+              <CorrelationTooltip
+                {...(props as CorrelationTooltipProps)}
+                startMs={start}
+              />
+            )}
+          />
+          <Legend
+            verticalAlign="top"
+            align="center"
+            height={24}
+            wrapperStyle={{ color: legendColor, paddingBottom: 4 }}
           />
           {pairs.map((pair, idx) => {
             const buffer = buffersRef.current.get(pair.key) ?? []

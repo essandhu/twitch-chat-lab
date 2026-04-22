@@ -45,7 +45,7 @@ export const HeatmapPanel = () => {
         <EngagementChart />
       </div>
       {isMulti && (
-        <div className="h-[220px] shrink-0 border-t border-border p-3">
+        <div className="h-[260px] shrink-0 border-t border-border p-3">
           <CorrelationPanel />
         </div>
       )}
