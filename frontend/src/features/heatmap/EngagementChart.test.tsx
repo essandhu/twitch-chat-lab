@@ -48,6 +48,11 @@ vi.mock('recharts', () => {
     </svg>
   )
   const Legend = () => <div className="recharts-legend-wrapper" data-testid="legend" />
+  // Tooltip renders nothing at rest; the real component only shows on hover,
+  // which happy-dom can't simulate reliably. Our production tooltip is asserted
+  // indirectly via ChartTooltip unit tests if they exist; here we just need the
+  // import to resolve to a renderable React node so EngagementChart mounts.
+  const Tooltip = () => null
 
   const XAxis = () => null
   const YAxis = () => null
@@ -66,6 +71,7 @@ vi.mock('recharts', () => {
     LineChart,
     Line,
     Legend,
+    Tooltip,
     XAxis,
     YAxis,
     ReferenceLine,

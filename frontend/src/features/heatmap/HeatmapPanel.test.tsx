@@ -22,7 +22,7 @@ describe('HeatmapPanel', () => {
         <HeatmapPanel />
       </div>,
     )
-    expect(screen.getByText('Now')).toBeInTheDocument()
+    expect(screen.getByText('Now (msg/s)')).toBeInTheDocument()
     expect(screen.getByText('1,234')).toBeInTheDocument()
   })
 
@@ -33,7 +33,7 @@ describe('HeatmapPanel', () => {
         <HeatmapPanel />
       </div>,
     )
-    expect(screen.getByText('Peak')).toBeInTheDocument()
+    expect(screen.getByText('Peak (msg/s)')).toBeInTheDocument()
     expect(screen.getByText('9,876')).toBeInTheDocument()
   })
 
