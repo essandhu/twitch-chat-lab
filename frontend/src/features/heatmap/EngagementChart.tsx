@@ -236,7 +236,7 @@ const MultiChart = ({ streams }: MultiChartProps) => {
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart margin={{ top: 16, right: 16, bottom: 24, left: 16 }}>
+      <LineChart margin={{ top: 32, right: 16, bottom: 28, left: 16 }}>
         <XAxis
           dataKey="timestamp"
           type="number"
@@ -249,7 +249,7 @@ const MultiChart = ({ streams }: MultiChartProps) => {
           label={{
             value: 'Time (mm:ss)',
             position: 'insideBottom',
-            offset: -8,
+            offset: -12,
             fill: axisLabelFill,
             fontSize: 10,
           }}
@@ -277,7 +277,12 @@ const MultiChart = ({ streams }: MultiChartProps) => {
             />
           )}
         />
-        <Legend wrapperStyle={{ color: legendColor }} />
+        <Legend
+          verticalAlign="top"
+          align="center"
+          height={24}
+          wrapperStyle={{ color: legendColor, paddingBottom: 4 }}
+        />
         {streams.map((s, idx) => (
           <Line
             key={s.login}
