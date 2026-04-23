@@ -112,13 +112,14 @@ describe('TopNav', () => {
     const user = userEvent.setup()
     renderNav()
     const toggle = screen.getByLabelText(/safe mode/i)
-    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    // Defaults on when unset.
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
     await user.click(toggle)
-    expect(screen.getByLabelText(/safe mode/i)).toHaveAttribute('aria-pressed', 'true')
-    expect(localStorage.getItem('tcl.safe-mode')).toBe('true')
-    await user.click(screen.getByLabelText(/safe mode/i))
     expect(screen.getByLabelText(/safe mode/i)).toHaveAttribute('aria-pressed', 'false')
     expect(localStorage.getItem('tcl.safe-mode')).toBe('false')
+    await user.click(screen.getByLabelText(/safe mode/i))
+    expect(screen.getByLabelText(/safe mode/i)).toHaveAttribute('aria-pressed', 'true')
+    expect(localStorage.getItem('tcl.safe-mode')).toBe('true')
   })
 
   it('pressing "/" focuses the search input when not in a form field', () => {

@@ -1,6 +1,8 @@
 import { useContext, useEffect, useMemo, useState } from 'react'
 import { Input } from '../../components/ui/Input'
 import { Skeleton } from '../../components/ui/Skeleton'
+import { useSafeMode } from '../../hooks/useSafeMode'
+import { censorText } from '../../lib/profanityFilter'
 import { tokenRgba } from '../../lib/theme'
 import { useChatStore } from '../../store/chatStore'
 import { useSemanticStore } from '../../store/semanticStore'
@@ -19,6 +21,7 @@ export function SemanticSearch(): JSX.Element {
   const runSearch = useSemanticStore((s) => s.runSearch)
   const messagesById = useChatStore((s) => s.messagesById)
   const scrollTo = useContext(ChatScrollContext)
+  const { safeMode } = useSafeMode()
 
   useEffect(() => {
     setSearchQuery(input)
@@ -83,7 +86,7 @@ export function SemanticSearch(): JSX.Element {
                     {msg ? new Date(msg.timestamp).toLocaleTimeString() : ''}
                   </span>
                 </div>
-                <span className="truncate text-sm text-text">{msg ? truncate(msg.text) : '(evicted)'}</span>
+                <span className="truncate text-sm text-text">{msg ? truncate(censorText(msg.text, safeMode)) : '(evicted)'}</span>
                 <span
                   className="mt-1 block h-1 w-full rounded-full"
                   aria-hidden="true"

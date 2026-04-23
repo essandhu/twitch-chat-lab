@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { Tooltip } from '../ui/Tooltip'
 import { useSemanticStore } from '../../store/semanticStore'
 
@@ -14,18 +13,8 @@ const ICON = (
   </svg>
 )
 
-const READY_HINT_MS = 5000
-
 export function SemanticStatusChip(): JSX.Element | null {
   const status = useSemanticStore((s) => s.status)
-  const [showReadyHint, setShowReadyHint] = useState(true)
-
-  useEffect(() => {
-    if (status !== 'ready') return
-    setShowReadyHint(true)
-    const id = setTimeout(() => setShowReadyHint(false), READY_HINT_MS)
-    return () => clearTimeout(id)
-  }, [status])
 
   if (status === 'idle') return null
 
@@ -37,8 +26,6 @@ export function SemanticStatusChip(): JSX.Element | null {
         ? 'text-text border-warning/40'
         : 'text-success border-success/50'
 
-  const compact = status === 'ready' && !showReadyHint
-
   return (
     <Tooltip content={<span className="font-mono text-[11px]">{label}</span>} side="bottom">
       <span
@@ -48,7 +35,7 @@ export function SemanticStatusChip(): JSX.Element | null {
         aria-label={label}
       >
         {ICON}
-        {!compact && <span>{status}</span>}
+        <span>{status}</span>
       </span>
     </Tooltip>
   )
