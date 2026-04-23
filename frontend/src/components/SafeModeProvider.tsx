@@ -12,9 +12,12 @@ const STORAGE_KEY = 'tcl.safe-mode'
 
 const readStored = (): boolean => {
   try {
-    return localStorage.getItem(STORAGE_KEY) === 'true'
+    const raw = localStorage.getItem(STORAGE_KEY)
+    // Unset → default on. Only an explicit 'false' disables.
+    if (raw === null) return true
+    return raw !== 'false'
   } catch {
-    return false
+    return true
   }
 }
 

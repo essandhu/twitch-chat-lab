@@ -1,5 +1,7 @@
 import { useContext, useMemo } from 'react'
 import { logger } from '../../lib/logger'
+import { censorText } from '../../lib/profanityFilter'
+import { useSafeMode } from '../../hooks/useSafeMode'
 import type { AccountAgeRecord, ChatMessage, ExtractedSignalKind, ExtractedSignalRef } from '../../types/twitch'
 import { ChatScrollContext } from '../chat/chatScrollContext'
 import { PRIMARY_STREAM_KEY, useIntelligenceStore } from '../../store/intelligenceStore'
@@ -35,6 +37,7 @@ export function ExtractedSignalList({
   accountAgeByUserId,
 }: Props): JSX.Element {
   const scrollTo = useContext(ChatScrollContext)
+  const { safeMode } = useSafeMode()
   const rows = useMemo(() => refs.slice(-MAX_ROWS).reverse(), [refs])
   const sliceAccountAge = useIntelligenceStore(
     (s) => s.slices[streamLogin ?? PRIMARY_STREAM_KEY]?.accountAge ?? {},
@@ -86,7 +89,7 @@ export function ExtractedSignalList({
                   {new Date(ref.timestamp).toLocaleTimeString()}
                 </span>
               </div>
-              <span className="truncate text-sm text-text">{msg ? msg.text : '(message evicted)'}</span>
+              <span className="truncate text-sm text-text">{msg ? censorText(msg.text, safeMode) : '(message evicted)'}</span>
             </button>
           </li>
         )
