@@ -35,13 +35,6 @@ const MoonIcon = () => (
   </Svg>
 )
 
-const MonitorIcon = () => (
-  <Svg>
-    <rect x="3" y="4" width="18" height="12" rx="2" />
-    <path d="M8 20h8M12 16v4" />
-  </Svg>
-)
-
 const UserIcon = () => (
   <Svg>
     <circle cx="12" cy="8" r="4" />
@@ -84,7 +77,7 @@ export type TopNavProps = {
 
 export const TopNav = ({ leadingRailTrigger }: TopNavProps = {}) => {
   const navigate = useNavigate()
-  const { theme, setTheme, resolvedTheme } = useTheme()
+  const { setTheme, resolvedTheme } = useTheme()
   const { safeMode, toggleSafeMode } = useSafeMode()
   const searchRef = useRef<HTMLInputElement>(null)
   const [channel, setChannel] = useState('')
@@ -124,10 +117,7 @@ export const TopNav = ({ leadingRailTrigger }: TopNavProps = {}) => {
 
   const cycleTheme = () => setTheme(nextTheme(resolvedTheme))
 
-  const ThemeIcon = () => {
-    if (theme === 'system') return <MonitorIcon />
-    return resolvedTheme === 'dark' ? <MoonIcon /> : <SunIcon />
-  }
+  const ThemeIcon = () => (resolvedTheme === 'dark' ? <MoonIcon /> : <SunIcon />)
 
   return (
     <nav
@@ -192,7 +182,7 @@ export const TopNav = ({ leadingRailTrigger }: TopNavProps = {}) => {
         <IconButton
           variant="ghost"
           size="md"
-          aria-label={`Theme: ${theme}`}
+          aria-label={`Theme: ${resolvedTheme}`}
           onClick={cycleTheme}
         >
           <ThemeIcon />
