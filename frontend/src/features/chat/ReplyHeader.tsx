@@ -1,6 +1,8 @@
 import { memo } from 'react'
 import { useChatStore } from '../../store/chatStore'
 import type { ChatMessageReply } from '../../types/twitch'
+import { useSafeMode } from '../../hooks/useSafeMode'
+import { censorText } from '../../lib/profanityFilter'
 
 const MAX_PREVIEW_CHARS = 60
 
@@ -16,6 +18,7 @@ interface ReplyHeaderProps {
 
 function ReplyHeaderInner({ reply, onScrollToParent }: ReplyHeaderProps) {
   const parent = useChatStore((s) => s.messagesById[reply.parentMessageId])
+  const { safeMode } = useSafeMode()
 
   if (!parent) {
     return (
@@ -23,7 +26,7 @@ function ReplyHeaderInner({ reply, onScrollToParent }: ReplyHeaderProps) {
     )
   }
 
-  const preview = truncate(reply.parentMessageText)
+  const preview = truncate(censorText(reply.parentMessageText, safeMode))
   return (
     <button
       type="button"

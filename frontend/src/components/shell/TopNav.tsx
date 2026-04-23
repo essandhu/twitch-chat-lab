@@ -5,6 +5,7 @@ import { IconButton } from '../ui/IconButton'
 import { Input } from '../ui/Input'
 import { DropdownMenu } from '../ui/DropdownMenu'
 import { useTheme } from '../../hooks/useTheme'
+import { useSafeMode } from '../../hooks/useSafeMode'
 import type { ResolvedTheme, ThemeChoice } from '../ThemeProvider'
 import { twitchAuthService } from '../../features/auth/authServices'
 import { isDemoMode } from '../../services/DemoModeService'
@@ -48,6 +49,19 @@ const UserIcon = () => (
   </Svg>
 )
 
+const ShieldIcon = () => (
+  <Svg>
+    <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" />
+  </Svg>
+)
+
+const ShieldOffIcon = () => (
+  <Svg>
+    <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" />
+    <path d="M3 3l18 18" />
+  </Svg>
+)
+
 const nextTheme = (resolved: ResolvedTheme): ThemeChoice =>
   resolved === 'dark' ? 'light' : 'dark'
 
@@ -71,6 +85,7 @@ export type TopNavProps = {
 export const TopNav = ({ leadingRailTrigger }: TopNavProps = {}) => {
   const navigate = useNavigate()
   const { theme, setTheme, resolvedTheme } = useTheme()
+  const { safeMode, toggleSafeMode } = useSafeMode()
   const searchRef = useRef<HTMLInputElement>(null)
   const [channel, setChannel] = useState('')
 
@@ -162,8 +177,18 @@ export const TopNav = ({ leadingRailTrigger }: TopNavProps = {}) => {
         </form>
       </div>
 
-      {/* Right: theme toggle + account menu */}
+      {/* Right: safe-mode toggle + theme toggle + account menu */}
       <div className="flex items-center gap-2">
+        <IconButton
+          variant="ghost"
+          size="md"
+          aria-label={`Safe mode: ${safeMode ? 'on' : 'off'}`}
+          aria-pressed={safeMode}
+          title={safeMode ? 'Safe mode on — profanity hidden' : 'Safe mode off'}
+          onClick={toggleSafeMode}
+        >
+          {safeMode ? <ShieldIcon /> : <ShieldOffIcon />}
+        </IconButton>
         <IconButton
           variant="ghost"
           size="md"
