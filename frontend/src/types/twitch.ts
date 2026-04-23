@@ -27,6 +27,20 @@ export interface HelixStream {
   thumbnail_url: string
 }
 
+export interface HelixChannelSearchResult {
+  id: string
+  broadcaster_login: string
+  display_name: string
+  broadcaster_language: string
+  game_id: string
+  game_name: string
+  title: string
+  thumbnail_url: string
+  is_live: boolean
+  started_at: string
+  tags: string[]
+}
+
 export interface HelixChatSettings {
   broadcaster_id: string
   slow_mode: boolean

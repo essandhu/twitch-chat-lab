@@ -2,6 +2,7 @@ import { logger } from '../lib/logger'
 import type {
   BadgeMap,
   HelixBadgeSet,
+  HelixChannelSearchResult,
   HelixChatSettings,
   HelixResponse,
   HelixStream,
@@ -115,6 +116,20 @@ export class TwitchHelixClient {
     const first = res.data[0]
     if (!first) throw new HelixError(404, 'no chat settings in response')
     return first
+  }
+
+  async searchChannels(
+    query: string,
+    options: { first?: number; signal?: AbortSignal } = {},
+  ): Promise<HelixChannelSearchResult[]> {
+    const trimmed = query.trim()
+    if (!trimmed) return []
+    const first = options.first ?? 8
+    const path = `/search/channels?query=${encodeURIComponent(trimmed)}&first=${first}`
+    const res = await this.request<HelixResponse<HelixChannelSearchResult>>(path, {
+      signal: options.signal,
+    })
+    return res.data
   }
 
   async getStreamsByCategory(gameId: string, first: number): Promise<HelixStream[]> {
