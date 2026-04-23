@@ -9,6 +9,8 @@ import { Avatar } from './ui/Avatar'
 import { Button } from './ui/Button'
 import { RaidRiskChip } from '../features/intelligence/RaidRiskChip'
 import { RaidRiskTuner } from '../features/intelligence/RaidRiskTuner'
+import { useSafeMode } from '../hooks/useSafeMode'
+import { censorText } from '../lib/profanityFilter'
 
 export function StreamHeader(): JSX.Element | null {
   const session = useChatStore((s) => s.session)
@@ -20,6 +22,7 @@ export function StreamHeader(): JSX.Element | null {
   const isMultiActive = useMultiStreamStore((s) => s.isActive)
   const multiStreamOrder = useMultiStreamStore((s) => s.order)
   const multiStreams = useMultiStreamStore((s) => s.streams)
+  const { safeMode } = useSafeMode()
 
   useEffect(() => {
     if (broadcasterLogin === null) return
@@ -146,7 +149,7 @@ export function StreamHeader(): JSX.Element | null {
             </span>
           </div>
           <p className="truncate font-mono text-[11px] text-text-muted">
-            {session.streamTitle || '—'}
+            {session.streamTitle ? censorText(session.streamTitle, safeMode) : '—'}
             <span className="mx-2 text-text-muted/50">·</span>
             <span className="uppercase tracking-[0.2em]">
               {session.gameName || 'uncategorized'}

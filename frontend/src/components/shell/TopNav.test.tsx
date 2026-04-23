@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ThemeProvider } from '../ThemeProvider'
+import { SafeModeProvider } from '../SafeModeProvider'
 import { useTheme } from '../../hooks/useTheme'
 import { PENDING_CHANNEL_KEY } from '../../features/auth/ConnectForm'
 import { TooltipProvider } from '../ui/Tooltip'
@@ -57,12 +58,14 @@ const renderNav = (extra?: React.ReactNode, initialEntries: string[] = ['/somewh
   render(
     <MemoryRouter initialEntries={initialEntries}>
       <ThemeProvider>
-        <TooltipProvider delayDuration={0}>
-          <TopNav />
-          <LocationProbe />
-          <ThemeProbe />
-          {extra}
-        </TooltipProvider>
+        <SafeModeProvider>
+          <TooltipProvider delayDuration={0}>
+            <TopNav />
+            <LocationProbe />
+            <ThemeProbe />
+            {extra}
+          </TooltipProvider>
+        </SafeModeProvider>
       </ThemeProvider>
     </MemoryRouter>,
   )
@@ -101,7 +104,21 @@ describe('TopNav', () => {
     expect(screen.getByText('twitch · chat · lab')).toBeInTheDocument()
     expect(screen.getByLabelText('Channel search')).toBeInTheDocument()
     expect(screen.getByLabelText(/theme/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/safe mode/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/account menu/i)).toBeInTheDocument()
+  })
+
+  it('safe-mode toggle flips state and persists to localStorage', async () => {
+    const user = userEvent.setup()
+    renderNav()
+    const toggle = screen.getByLabelText(/safe mode/i)
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    await user.click(toggle)
+    expect(screen.getByLabelText(/safe mode/i)).toHaveAttribute('aria-pressed', 'true')
+    expect(localStorage.getItem('tcl.safe-mode')).toBe('true')
+    await user.click(screen.getByLabelText(/safe mode/i))
+    expect(screen.getByLabelText(/safe mode/i)).toHaveAttribute('aria-pressed', 'false')
+    expect(localStorage.getItem('tcl.safe-mode')).toBe('false')
   })
 
   it('pressing "/" focuses the search input when not in a form field', () => {

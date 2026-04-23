@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ThemeProvider } from '../ThemeProvider'
+import { SafeModeProvider } from '../SafeModeProvider'
 import { TooltipProvider } from '../ui/Tooltip'
 import { ToastProvider } from '../ui/Toast'
 import { IconButton } from '../ui/IconButton'
@@ -175,29 +176,31 @@ export const AppShell = ({ top, rail, main, dock }: AppShellProps) => {
 
   return (
     <ThemeProvider>
-      <TooltipProvider>
-        <ToastProvider>
-          {isMobile ? (
-            <MobileShell
-              top={top}
-              rail={rail}
-              main={main}
-              dock={dockWithDefault}
-              reducedMotion={reducedMotion}
-              firstMount={firstMount}
-            />
-          ) : (
-            <DesktopShell
-              top={top}
-              rail={rail}
-              main={main}
-              dock={dockWithDefault}
-              reducedMotion={reducedMotion}
-              firstMount={firstMount}
-            />
-          )}
-        </ToastProvider>
-      </TooltipProvider>
+      <SafeModeProvider>
+        <TooltipProvider>
+          <ToastProvider>
+            {isMobile ? (
+              <MobileShell
+                top={top}
+                rail={rail}
+                main={main}
+                dock={dockWithDefault}
+                reducedMotion={reducedMotion}
+                firstMount={firstMount}
+              />
+            ) : (
+              <DesktopShell
+                top={top}
+                rail={rail}
+                main={main}
+                dock={dockWithDefault}
+                reducedMotion={reducedMotion}
+                firstMount={firstMount}
+              />
+            )}
+          </ToastProvider>
+        </TooltipProvider>
+      </SafeModeProvider>
     </ThemeProvider>
   )
 }

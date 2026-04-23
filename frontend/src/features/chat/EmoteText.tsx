@@ -1,5 +1,7 @@
 import { memo } from 'react'
 import type { MessageFragment } from '../../types/twitch'
+import { useSafeMode } from '../../hooks/useSafeMode'
+import { censorText } from '../../lib/profanityFilter'
 
 const emoteUrl = (id: string): string =>
   `https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/1.0`
@@ -10,6 +12,7 @@ interface EmoteTextProps {
 }
 
 function EmoteTextImpl({ fragments, cheerTierColor }: EmoteTextProps) {
+  const { safeMode } = useSafeMode()
   return (
     <>
       {fragments.map((fragment, index) => {
@@ -38,7 +41,7 @@ function EmoteTextImpl({ fragments, cheerTierColor }: EmoteTextProps) {
         }
         return (
           <span key={index} className="whitespace-pre-wrap">
-            {fragment.text}
+            {censorText(fragment.text, safeMode)}
           </span>
         )
       })}
