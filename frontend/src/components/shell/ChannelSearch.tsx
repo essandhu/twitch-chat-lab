@@ -137,6 +137,7 @@ export const ChannelSearch = forwardRef<HTMLInputElement, ChannelSearchProps>(
           <Input
             ref={ref}
             type="text"
+            role="combobox"
             value={query}
             onChange={onChange}
             onFocus={() => setOpen(true)}
