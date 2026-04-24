@@ -14,6 +14,9 @@ vi.mock('../../features/auth/authServices', () => ({
     getToken: vi.fn().mockReturnValue(null),
     clearToken: vi.fn(),
   },
+  twitchHelixClient: {
+    searchChannels: vi.fn().mockResolvedValue([]),
+  },
 }))
 
 vi.mock('../../services/DemoModeService', async () => {

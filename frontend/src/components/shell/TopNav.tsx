@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/cn'
 import { IconButton } from '../ui/IconButton'
-import { Input } from '../ui/Input'
 import { DropdownMenu } from '../ui/DropdownMenu'
 import { useTheme } from '../../hooks/useTheme'
 import { useSafeMode } from '../../hooks/useSafeMode'
@@ -12,6 +11,7 @@ import { isDemoMode } from '../../services/DemoModeService'
 import { PENDING_CHANNEL_KEY } from '../../features/auth/ConnectForm'
 import { SemanticStatusChip } from './SemanticStatusChip'
 import { Tooltip } from '../ui/Tooltip'
+import { ChannelSearch } from './ChannelSearch'
 
 const SEMANTIC_DISCLOSURE = 'Embeddings run locally; no chat content leaves your browser.'
 
@@ -80,7 +80,6 @@ export const TopNav = ({ leadingRailTrigger }: TopNavProps = {}) => {
   const { setTheme, resolvedTheme } = useTheme()
   const { safeMode, toggleSafeMode } = useSafeMode()
   const searchRef = useRef<HTMLInputElement>(null)
-  const [channel, setChannel] = useState('')
 
   // Derive auth-state snapshot per render so menu items reflect current state.
   const token = twitchAuthService.getToken()
@@ -101,14 +100,11 @@ export const TopNav = ({ leadingRailTrigger }: TopNavProps = {}) => {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const trimmed = channel.trim().toLowerCase()
-    if (!trimmed) return
-    sessionStorage.setItem(PENDING_CHANNEL_KEY, trimmed)
+  const onSearchSubmit = (login: string) => {
+    sessionStorage.setItem(PENDING_CHANNEL_KEY, login)
     if (twitchAuthService.getToken() !== null) {
       window.dispatchEvent(
-        new CustomEvent('tcl.reconnect', { detail: { channel: trimmed } }),
+        new CustomEvent('tcl.reconnect', { detail: { channel: login } }),
       )
     } else {
       twitchAuthService.authorize()
@@ -153,18 +149,13 @@ export const TopNav = ({ leadingRailTrigger }: TopNavProps = {}) => {
 
       {/* Center: search */}
       <div className="flex-1 flex justify-center">
-        <form onSubmit={onSubmit} className="w-full max-w-md">
-          <Input
+        <div className="w-full max-w-md">
+          <ChannelSearch
             ref={searchRef}
-            type="text"
-            value={channel}
-            onChange={(e) => setChannel(e.target.value)}
-            placeholder="Search a Twitch channel…"
-            aria-label="Channel search"
-            autoComplete="off"
-            spellCheck={false}
+            authed={authed}
+            onSubmit={onSearchSubmit}
           />
-        </form>
+        </div>
       </div>
 
       {/* Right: safe-mode toggle + theme toggle + account menu */}
