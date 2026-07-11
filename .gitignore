@@ -19,5 +19,6 @@ proxy/server
 proxy/server.exe
 proxy/.gotmp/
 
-# Internal planning / review docs
-docs/
+# Internal planning / review docs (docs/media is published — README assets)
+docs/*
+!docs/media/

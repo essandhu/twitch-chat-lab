@@ -2,11 +2,20 @@
 
 A high-throughput Twitch chat interface with engagement instrumentation, smart filters, and a multi-stream comparison view.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/hero.png">
+  <img src="docs/media/hero-light.png" alt="Main view: virtualized live chat with a pinned message and first-time-chatter highlights, engagement heatmap with subscription, hype-train, and raid markers, Moments strip, and smart-filter toolbar">
+</picture>
+
+<sub>Captured from the running app in demo mode with a scripted session — every README visual regenerates via [`docs/media/capture.mjs`](docs/media/capture.mjs).</sub>
+
 ## Live demo
 
 **https://twitch-chat-lab.vercel.app/?demo=1**
 
 No login required — read-only demo against a popular live channel.
+
+![A raid landing mid-session: chat accelerates from 3 to 6 messages per second while the raid marker and spike appear on the engagement heatmap](docs/media/demo.gif)
 
 ## Features
 
@@ -16,6 +25,19 @@ No login required — read-only demo against a popular live channel.
 - **First-time chatter spotlight** — per-session detection (first-message-in-session, not "first ever in channel" — EventSub does not expose that, and the UI tooltip says so).
 - **Multi-stream chat comparison** — 2 or 3 streams in the same Twitch category, side-by-side, fanned in by a Go WebSocket proxy. One client WebSocket; the proxy maintains one EventSub connection per stream. A side dock surfaces a cross-stream Spotlight feed (stick-to-bottom auto-scroll with "Jump to latest") and an Intelligence panel whose Questions / Callouts / Bits tabs each support an **All streams** merged view with per-row source badges.
 - **Performance instrumentation overlay** — `Ctrl+Shift+P` reveals render msg/s, virtualizer time, DOM node count, JS heap (Chromium-only), and EventSub end-to-end latency.
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs/media/multi-stream.png" alt="Multi-stream comparison: three side-by-side chat columns with per-column filters and intelligence chips, and the cross-stream Spotlight feed with per-row source badges">
+      <p align="center"><sub>Multi-stream comparison — 3 channels fanned in through the Go proxy, with the cross-stream Spotlight dock</sub></p>
+    </td>
+    <td width="50%">
+      <img src="docs/media/intelligence.png" alt="Intelligence panel showing extracted questions, broadcaster callouts, and bits events from the live session">
+      <p align="center"><sub>Intelligence panel — questions, callouts, and bits extracted live from chat</sub></p>
+    </td>
+  </tr>
+</table>
 
 ## Semantic search & moments
 
@@ -53,6 +75,45 @@ Every live session can be recorded to a local `.jsonl` file and replayed later w
 | **DOM nodes** | `document.querySelectorAll('*').length`, polled every 500 ms | Bounded — should not grow with message count |
 | **Heap** | `performance.memory.usedJSHeapSize / 1 MB` (Chromium only; `n/a` elsewhere) | < 200 MB; amber above |
 | **EventSub latency** | `Date.now() - metadata.message_timestamp`, exponentially smoothed | < 500 ms; amber above. Measures browser→Twitch round-trip. |
+
+![Performance overlay in the corner of a live session showing render throughput, virtualizer time, DOM node count, heap usage, and EventSub latency](docs/media/perf-overlay.png)
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph client["Browser — React SPA (Vercel)"]
+    direction TB
+    ui["Chat UI · heatmap · filters<br/>React 18 + @tanstack/react-virtual"]
+    stores[("Zustand stores")]
+    esm["EventSubManager"]
+    rec["Recorder / Replayer<br/>.jsonl sessions"]
+    worker["Web Worker<br/>transformers.js embeddings<br/>(chat never leaves the browser)"]
+  end
+
+  subgraph twitch["Twitch"]
+    helix["Helix REST"]
+    es["EventSub WebSocket"]
+  end
+
+  subgraph goproxy["Go proxy (Fly.io) — multi-stream only"]
+    direction TB
+    up["1 EventSub connection per stream<br/>goroutine + reconnect backoff"]
+    agg["Fan-in aggregator<br/>envelopes tagged with stream_login"]
+  end
+
+  helix -->|"stream metadata · badges"| ui
+  es -->|"single stream"| esm
+  es -->|"2–3 upstreams"| up
+  up --> agg
+  agg -->|"one client WebSocket"| esm
+  esm --> stores
+  stores --> ui
+  stores <--> worker
+  esm <--> rec
+```
+
+Single-stream sessions talk to Twitch directly: one EventSub WebSocket into `EventSubManager`, which routes frames into Zustand stores that the UI subscribes to by slice. Multi-stream mode goes through the Go proxy instead — one goroutine-owned EventSub connection per stream, fanned into a single client WebSocket as envelopes tagged with `stream_login`. The recorder taps the same frame stream on the way in, which is why replayed `.jsonl` sessions flow through the identical store-write path as live chat. The semantic layer never leaves the browser: a Web Worker runs transformers.js over chat text pulled from the stores.
 
 ## Tech decisions
 
