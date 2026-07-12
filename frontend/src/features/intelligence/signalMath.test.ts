@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { ChatMessage, MessageFragment } from '../../types/twitch'
 import {
   accountAgeBucket,
@@ -164,6 +164,19 @@ describe('newChatterInflux', () => {
 })
 
 describe('accountAgeBucket', () => {
+  // accountAgeBucket measures age against Date.now() (via daysSince), so the
+  // top-of-calibration expectation ('new' = created < 30 days ago, createdAt
+  // 2026-04-15) decays to 'recent' once real time moves a month past the
+  // calibration snapshot. Freeze the clock near that snapshot to keep the
+  // assertions about the calibration table, not about today's date.
+  beforeAll(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-20T00:00:00Z'))
+  })
+  afterAll(() => {
+    vi.useRealTimers()
+  })
+
   it('id=1 → established', () => {
     expect(accountAgeBucket('1')).toBe('established')
   })
