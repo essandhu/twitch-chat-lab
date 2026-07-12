@@ -2,10 +2,7 @@
 
 A high-throughput Twitch chat interface with engagement instrumentation, smart filters, and a multi-stream comparison view.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/hero.png">
-  <img src="docs/media/hero-light.png" alt="Main view: virtualized live chat with a pinned message and first-time-chatter highlights, engagement heatmap with subscription, hype-train, and raid markers, Moments strip, and smart-filter toolbar">
-</picture>
+![A raid landing mid-session: chat accelerates from 3 to 6 messages per second while the raid marker and spike appear on the engagement heatmap](docs/media/demo.gif)
 
 <sub>Captured from the running app in demo mode with a scripted session — every README visual regenerates via [`docs/media/capture.mjs`](docs/media/capture.mjs).</sub>
 
@@ -15,7 +12,10 @@ A high-throughput Twitch chat interface with engagement instrumentation, smart f
 
 No login required — read-only demo against a popular live channel.
 
-![A raid landing mid-session: chat accelerates from 3 to 6 messages per second while the raid marker and spike appear on the engagement heatmap](docs/media/demo.gif)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/hero.png">
+  <img src="docs/media/hero-light.png" alt="Main view: virtualized live chat with a pinned message and first-time-chatter highlights, engagement heatmap with subscription, hype-train, and raid markers, Moments strip, and smart-filter toolbar">
+</picture>
 
 ## Features
 
